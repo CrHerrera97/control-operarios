@@ -15,15 +15,23 @@
 		button { background: #b83232; }
 		.tabla-contenedor { overflow-x: auto; background: var(--blanco); border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,.08); }
 		table { width: 100%; min-width: 980px; border-collapse: collapse; }
-		th, td { padding: 14px 12px; border-bottom: 1px solid #e5e9ef; text-align: left; vertical-align: middle; }
+		th, td { padding: 14px 12px; border-bottom: 1px solid rgba(119, 134, 156, 0.35); text-align: left; vertical-align: middle; }
 		th { background: var(--azul); color: var(--blanco); white-space: nowrap; }
 		tr:last-child td { border-bottom: 0; }
+		th:nth-child(7), td:nth-child(7) { border-bottom-color: rgba(119, 134, 156, 0.2); }
 		.movimiento { font-weight: bold; }
 		.entrada { color: #227447; }
 		.salida { color: #b83232; }
-		.foto { width: 82px; height: 62px; border-radius: 6px; object-fit: cover; display: block; }
+		.foto { width: 82px; height: 62px; border-radius: 6px; object-fit: cover; display: block; cursor: pointer; transition: transform .2s ease; border: 1px solid rgba(49, 98, 154, 0.18); }
+		.foto:hover { transform: scale(1.03); }
+		.foto-link { display: inline-flex; align-items: center; justify-content: center; border-radius: 8px; background: #fff; }
 		.mapa-enlace { white-space: nowrap; }
 		.vacio { padding: 34px; text-align: center; color: #657386; }
+		.modal-foto { position: fixed; inset: 0; background: rgba(15, 23, 42, 0.72); display: none; align-items: center; justify-content: center; padding: 24px; z-index: 1000; }
+		.modal-foto.visible { display: flex; }
+		.modal-cuerpo { position: relative; max-width: min(90vw, 900px); max-height: 90vh; background: #fff; border-radius: 14px; padding: 18px; box-shadow: 0 25px 80px rgba(0,0,0,.22); }
+		.modal-cuerpo img { display: block; max-width: 100%; max-height: 78vh; border-radius: 10px; object-fit: contain; background: #f4f5f7; }
+		.cerrar-foto { position: absolute; top: 12px; right: 12px; border: 0; border-radius: 999px; background: rgba(184, 50, 50, .95); color: #fff; width: 38px; height: 38px; font-size: 22px; line-height: 1; cursor: pointer; padding: 0; }
 		.nota { margin: 0 0 16px; color: #657386; font-size: 14px; }
 		.filtros { display: grid; grid-template-columns: 2fr 1fr 1fr 1fr 1fr auto; gap: 12px; margin-bottom: 18px; padding: 16px; background: var(--blanco); border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,.06); }
 		.filtros label { display: flex; flex-direction: column; gap: 6px; color: var(--azul); font-size: 13px; font-weight: bold; }
@@ -85,6 +93,12 @@
 		</table>
 		<div class="vacio" id="vacio">Todavía no hay movimientos registrados.</div>
 	</section>
+	<div id="modalFoto" class="modal-foto" aria-modal="true" role="dialog" aria-label="Vista de la fotografía">
+		<div class="modal-cuerpo">
+			<button class="cerrar-foto" type="button" aria-label="Cerrar vista" onclick="cerrarFoto()">×</button>
+			<img id="modalImagen" src="" alt="Fotografía ampliada">
+		</div>
+	</div>
 </main>
 <script>
 	const URL_MOVIMIENTOS = 'https://asistencia.rhelectronics.com.co/backend-control-operarios/controllers/movimientos.php';
@@ -121,6 +135,7 @@
 		registrosFiltrados.forEach(function(registro) {
 		const fila = document.createElement("tr");
 		const claseMovimiento = registro.tipo === "ENTRADA" ? "entrada" : "salida";
+		const fotoSrc = `data:image/jpeg;base64,${registro.fotografia}`;
 		fila.innerHTML = `
 			<td>${escapar(registro.persona)}</td>
 			<td class="movimiento ${claseMovimiento}">${escapar(registro.tipo)}</td>
@@ -128,9 +143,17 @@
 			<td>${Number(registro.latitud).toFixed(6)}</td>
 			<td>${Number(registro.longitud).toFixed(6)}</td>
 			<td><a class="mapa-enlace" href="https://www.google.com/maps?q=${Number(registro.latitud)},${Number(registro.longitud)}" target="_blank" rel="noopener noreferrer">Ver mapa</a></td>
-			<td><img class="foto" src="data:image/jpeg;base64,${registro.fotografia}" alt="Foto de ${escapar(registro.persona)}"></td>
+			<td><a class="foto-link" href="#" data-imagen="${fotoSrc}" aria-label="Ver foto de ${escapar(registro.persona)}"><img class="foto" src="${fotoSrc}" alt="Foto de ${escapar(registro.persona)}"></a></td>
 			<td>${new Date(registro.fecha_hora).toLocaleString("es-ES")}</td>`;
 		cuerpo.appendChild(fila);
+		});
+
+		const enlacesFoto = document.querySelectorAll(".foto-link");
+		enlacesFoto.forEach(function(enlace) {
+			enlace.addEventListener("click", function(evento) {
+				evento.preventDefault();
+				abrirFoto(this.dataset.imagen);
+			});
 		});
 
 		vacio.textContent = registros.length ? "No hay registros que coincidan con los filtros." : "Todavía no hay movimientos registrados.";
@@ -214,6 +237,32 @@
 	}
 
 	cargarRegistros();
+
+	function abrirFoto(src) {
+		const modal = document.getElementById("modalFoto");
+		const imagen = document.getElementById("modalImagen");
+		if (!modal || !imagen) return;
+		imagen.src = src;
+		modal.classList.add("visible");
+	}
+
+	function cerrarFoto() {
+		const modal = document.getElementById("modalFoto");
+		if (!modal) return;
+		modal.classList.remove("visible");
+	}
+
+	document.getElementById("modalFoto").addEventListener("click", function(evento) {
+		if (evento.target === this) {
+			cerrarFoto();
+		}
+	});
+
+	document.addEventListener("keydown", function(evento) {
+		if (evento.key === "Escape") {
+			cerrarFoto();
+		}
+	});
 
 	function escapar(valor) {
 		const elemento = document.createElement("span");
