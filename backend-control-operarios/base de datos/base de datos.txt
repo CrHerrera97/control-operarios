@@ -1,0 +1,36 @@
+CREATE DATABASE control_operarios
+  CHARACTER SET utf8mb4
+  COLLATE utf8mb4_unicode_ci;
+
+USE control_operarios;
+
+CREATE TABLE usuarios (
+    id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    usuario VARCHAR(50) NOT NULL UNIQUE,
+    contrasena_hash VARCHAR(255) NOT NULL,
+    nombre_completo VARCHAR(150) NOT NULL,
+    rol ENUM('ADMIN', 'OPERARIO') NOT NULL DEFAULT 'OPERARIO',
+    activo BOOLEAN NOT NULL DEFAULT TRUE,
+    creado_en DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB;
+
+CREATE TABLE movimientos (
+    id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    usuario_id BIGINT UNSIGNED NOT NULL,
+    movimiento ENUM('ENTRADA', 'SALIDA') NOT NULL,
+    obra VARCHAR(150) NOT NULL,
+    latitud DECIMAL(10, 8) NOT NULL,
+    longitud DECIMAL(11, 8) NOT NULL,
+    fotografia MEDIUMBLOB NOT NULL,
+    fecha_hora DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT fk_movimientos_usuario
+        FOREIGN KEY (usuario_id)
+        REFERENCES usuarios(id)
+        ON UPDATE CASCADE
+        ON DELETE RESTRICT,
+
+    INDEX idx_movimientos_fecha (fecha_hora),
+    INDEX idx_movimientos_tipo (movimiento),
+    INDEX idx_movimientos_usuario (usuario_id)
+) ENGINE=InnoDB;

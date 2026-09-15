@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cerrando sesión | Control de operarios</title>
+</head>
+<body>
+    <p>Cerrando sesión...</p>
+
+    <script>
+        const URL_LOGOUT = 'https://asistencia.rhelectronics.com.co/backend-control-operarios/controllers/logout.php';
+
+        async function cerrarSesion() {
+            try {
+                await fetch(URL_LOGOUT, {
+                    method: 'POST',
+                    credentials: 'include'
+                });
+            } finally {
+                localStorage.removeItem('usuarioSesion');
+                window.location.replace('login.html');
+            }
+        }
+
+        cerrarSesion();
+    </script>
+</body>
+</html>

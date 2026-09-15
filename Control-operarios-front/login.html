@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Acceso | Control de operarios</title>
+    <style>
+        :root {
+            --azul: #31629a;
+            --amarillo: #f5c223;
+            --blanco: #ffffff;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            min-height: 100vh;
+            margin: 0;
+            display: grid;
+            place-items: center;
+            padding: 24px;
+            font-family: Arial, sans-serif;
+            background: var(--azul);
+        }
+
+        .login {
+            width: min(100%, 390px);
+            padding: 38px 34px 34px;
+            background: var(--blanco);
+            border-top: 9px solid var(--amarillo);
+            border-radius: 14px;
+            box-shadow: 0 18px 45px rgba(20, 45, 80, 0.25);
+        }
+
+        h1 {
+            margin: 0 0 28px;
+            color: var(--azul);
+            font-size: 28px;
+            text-align: center;
+        }
+
+        .campo {
+            display: block;
+            margin-bottom: 18px;
+            color: var(--azul);
+            font-size: 15px;
+            font-weight: bold;
+        }
+
+        input {
+            width: 100%;
+            margin-top: 8px;
+            padding: 13px 14px;
+            border: 2px solid #d7e0eb;
+            border-radius: 7px;
+            color: #1f2f43;
+            font: inherit;
+            outline: none;
+        }
+
+        input:focus {
+            border-color: var(--azul);
+            box-shadow: 0 0 0 3px rgba(245, 194, 35, 0.35);
+        }
+
+        button {
+            width: 100%;
+            margin-top: 6px;
+            padding: 14px;
+            border: 0;
+            border-radius: 7px;
+            background: var(--amarillo);
+            color: #233b5a;
+            font: inherit;
+            font-weight: bold;
+            cursor: pointer;
+        }
+
+        button:hover {
+            background: #e8b713;
+        }
+
+        button:focus-visible {
+            outline: 3px solid var(--azul);
+            outline-offset: 3px;
+        }
+
+        button:disabled {
+            cursor: wait;
+            opacity: 0.7;
+        }
+
+        .mensaje {
+            min-height: 20px;
+            margin: 16px 0 0;
+            color: #b42318;
+            font-size: 14px;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+    <main class="login">
+        <h1>Iniciar sesión</h1>
+        <form id="formularioLogin">
+            <label class="campo" for="usuario">
+                Usuario
+                <input type="text" id="usuario" name="usuario" autocomplete="username" required>
+            </label>
+
+            <label class="campo" for="contrasena">
+                Contraseña
+                <input type="password" id="contrasena" name="contrasena" autocomplete="current-password" required>
+            </label>
+
+            <button type="submit">ENTRAR</button>
+            <p id="mensajeLogin" class="mensaje" role="alert" aria-live="polite"></p>
+        </form>
+    </main>
+
+    <script>
+        const URL_LOGIN = 'https://asistencia.rhelectronics.com.co/backend-control-operarios/controllers/login.php';
+        const formularioLogin = document.getElementById('formularioLogin');
+        const mensajeLogin = document.getElementById('mensajeLogin');
+        const botonLogin = formularioLogin.querySelector('button[type="submit"]');
+
+        formularioLogin.addEventListener('submit', async (evento) => {
+            evento.preventDefault();
+            mensajeLogin.textContent = '';
+            botonLogin.disabled = true;
+            botonLogin.textContent = 'VALIDANDO...';
+
+            const datos = new FormData(formularioLogin);
+
+            try {
+                const respuesta = await fetch(URL_LOGIN, {
+                    method: 'POST',
+                    body: datos,
+                    credentials: 'include'
+                });
+                const resultado = await respuesta.json();
+
+                if (!respuesta.ok || !resultado.exito) {
+                    throw new Error(resultado.mensaje || 'No se pudo iniciar sesión.');
+                }
+
+                localStorage.setItem('usuarioSesion', JSON.stringify(resultado.usuario));
+                window.location.href = resultado.usuario.rol === 'ADMIN' ? 'admin.html' : 'control.html';
+            } catch (error) {
+                mensajeLogin.textContent = error.message || 'No se pudo conectar con el servidor.';
+                botonLogin.disabled = false;
+                botonLogin.textContent = 'ENTRAR';
+            }
+        });
+    </script>
+</body>
+</html>

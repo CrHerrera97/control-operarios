@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<title>Registros | Control de operarios</title>
+	<style>
+		:root { --azul: #31629a; --amarillo: #f5c223; --blanco: #fff; }
+		* { box-sizing: border-box; }
+		body { margin: 0; padding: 28px; font-family: Arial, sans-serif; background: #f4f5f7; color: #1f2f43; }
+		main { max-width: 1400px; margin: 0 auto; }
+		header { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 24px; }
+		h1 { margin: 0; color: var(--azul); }
+		a, button { border: 0; border-radius: 8px; padding: 12px 16px; background: var(--azul); color: var(--blanco); font: inherit; font-weight: bold; text-decoration: none; cursor: pointer; }
+		button { background: #b83232; }
+		.tabla-contenedor { overflow-x: auto; background: var(--blanco); border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,.08); }
+		table { width: 100%; min-width: 980px; border-collapse: collapse; }
+		th, td { padding: 14px 12px; border-bottom: 1px solid #e5e9ef; text-align: left; vertical-align: middle; }
+		th { background: var(--azul); color: var(--blanco); white-space: nowrap; }
+		tr:last-child td { border-bottom: 0; }
+		.movimiento { font-weight: bold; }
+		.entrada { color: #227447; }
+		.salida { color: #b83232; }
+		.foto { width: 82px; height: 62px; border-radius: 6px; object-fit: cover; display: block; }
+		.mapa-enlace { white-space: nowrap; }
+		.vacio { padding: 34px; text-align: center; color: #657386; }
+		.nota { margin: 0 0 16px; color: #657386; font-size: 14px; }
+		.filtros { display: grid; grid-template-columns: 2fr 1fr 1fr 1fr 1fr auto; gap: 12px; margin-bottom: 18px; padding: 16px; background: var(--blanco); border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,.06); }
+		.filtros label { display: flex; flex-direction: column; gap: 6px; color: var(--azul); font-size: 13px; font-weight: bold; }
+		.filtros input, .filtros select { width: 100%; min-height: 42px; padding: 9px 10px; border: 2px solid #d7e0eb; border-radius: 7px; color: #1f2f43; font: inherit; }
+		.filtros input:focus, .filtros select:focus { border-color: var(--azul); outline: none; }
+		.limpiar { align-self: end; background: #657386; white-space: nowrap; }
+		.resultados { margin: 0 0 12px; color: #657386; font-size: 14px; }
+		.exportar { display: flex; gap: 10px; margin-bottom: 18px; }
+		.exportar button { background: #227447; }
+		.exportar .pdf { background: #b83232; }
+		@media print { body { padding: 0; background: #fff; } header, .filtros, .nota, .resultados, .exportar { display: none; } .tabla-contenedor { box-shadow: none; } table { min-width: 0; font-size: 10px; } .foto { width: 58px; height: 44px; } }
+		@media (max-width: 620px) { body { padding: 18px 12px; } header { align-items: flex-start; flex-direction: column; } h1 { font-size: 25px; } }
+		@media (max-width: 900px) { .filtros { grid-template-columns: repeat(2, 1fr); } .limpiar { align-self: center; } }
+		@media (max-width: 480px) { .filtros { grid-template-columns: 1fr; } .limpiar { width: 100%; } }
+	</style>
+</head>
+<body>
+<main>
+	<header>
+		<h1>Registro de movimientos</h1>
+		<div>
+			<a href="usuarios.html">Gestionar usuarios</a>
+		</div>
+	</header>
+	<p class="nota" id="estadoFecha"></p>
+	<section class="filtros" aria-label="Filtros de registros">
+		<label for="filtroPersona">Persona
+			<input type="search" id="filtroPersona" placeholder="Buscar por nombre">
+		</label>
+		<label for="filtroTipo">Movimiento
+			<select id="filtroTipo">
+				<option value="">Todos</option>
+				<option value="ENTRADA">ENTRADA</option>
+				<option value="SALIDA">SALIDA</option>
+			</select>
+		</label>
+		<label for="filtroObra">Obra
+			<input type="search" id="filtroObra" placeholder="Buscar por obra">
+		</label>
+		<label for="filtroDesde">Desde
+			<input type="date" id="filtroDesde">
+		</label>
+		<label for="filtroHasta">Hasta
+			<input type="date" id="filtroHasta">
+		</label>
+		<button class="limpiar" type="button" onclick="limpiarFiltros()">Limpiar filtros</button>
+	</section>
+	<p class="resultados" id="contadorRegistros"></p>
+	<div class="exportar">
+		<button type="button" onclick="exportarExcel()">Exportar Excel</button>
+		<button class="pdf" type="button" onclick="exportarPdf()">Exportar PDF</button>
+	</div>
+	<section class="tabla-contenedor">
+		<table>
+			<thead>
+				<tr><th>Persona</th><th>Movimiento</th><th>Obra</th><th>Latitud</th><th>Longitud</th><th>Mapa</th><th>Fotografía</th><th>Fecha y hora</th></tr>
+			</thead>
+			<tbody id="registros"></tbody>
+		</table>
+		<div class="vacio" id="vacio">Todavía no hay movimientos registrados.</div>
+	</section>
+</main>
+<script>
+	const URL_MOVIMIENTOS = 'https://asistencia.rhelectronics.com.co/backend-control-operarios/controllers/movimientos.php';
+	const cuerpo = document.getElementById("registros");
+	const vacio = document.getElementById("vacio");
+	const estadoFecha = document.getElementById("estadoFecha");
+	const contadorRegistros = document.getElementById("contadorRegistros");
+	const filtroPersona = document.getElementById("filtroPersona");
+	const filtroTipo = document.getElementById("filtroTipo");
+	const filtroObra = document.getElementById("filtroObra");
+	const filtroDesde = document.getElementById("filtroDesde");
+	const filtroHasta = document.getElementById("filtroHasta");
+	let registros = [];
+	let registrosVisibles = [];
+
+	function mostrarRegistros() {
+		const personaBuscada = filtroPersona.value.trim().toLocaleLowerCase();
+		const tipoBuscado = filtroTipo.value;
+		const obraBuscada = filtroObra.value.trim().toLocaleLowerCase();
+		const fechaDesde = filtroDesde.value ? new Date(filtroDesde.value + "T00:00:00") : null;
+		const fechaHasta = filtroHasta.value ? new Date(filtroHasta.value + "T23:59:59.999") : null;
+		const registrosFiltrados = registros.filter(function(registro) {
+			const fechaRegistro = new Date(registro.fecha_hora);
+			const coincidePersona = !personaBuscada || registro.persona.toLocaleLowerCase().includes(personaBuscada);
+			const coincideTipo = !tipoBuscado || registro.tipo === tipoBuscado;
+			const coincideObra = !obraBuscada || (registro.obra || "").toLocaleLowerCase().includes(obraBuscada);
+			const coincideDesde = !fechaDesde || fechaRegistro >= fechaDesde;
+			const coincideHasta = !fechaHasta || fechaRegistro <= fechaHasta;
+			return coincidePersona && coincideTipo && coincideObra && coincideDesde && coincideHasta;
+		});
+		registrosVisibles = registrosFiltrados;
+
+		cuerpo.innerHTML = "";
+		registrosFiltrados.forEach(function(registro) {
+		const fila = document.createElement("tr");
+		const claseMovimiento = registro.tipo === "ENTRADA" ? "entrada" : "salida";
+		fila.innerHTML = `
+			<td>${escapar(registro.persona)}</td>
+			<td class="movimiento ${claseMovimiento}">${escapar(registro.tipo)}</td>
+			<td>${escapar(registro.obra || "")}</td>
+			<td>${Number(registro.latitud).toFixed(6)}</td>
+			<td>${Number(registro.longitud).toFixed(6)}</td>
+			<td><a class="mapa-enlace" href="https://www.google.com/maps?q=${Number(registro.latitud)},${Number(registro.longitud)}" target="_blank" rel="noopener noreferrer">Ver mapa</a></td>
+			<td><img class="foto" src="data:image/jpeg;base64,${registro.fotografia}" alt="Foto de ${escapar(registro.persona)}"></td>
+			<td>${new Date(registro.fecha_hora).toLocaleString("es-ES")}</td>`;
+		cuerpo.appendChild(fila);
+		});
+
+		vacio.textContent = registros.length ? "No hay registros que coincidan con los filtros." : "Todavía no hay movimientos registrados.";
+		vacio.style.display = registrosFiltrados.length ? "none" : "block";
+		contadorRegistros.textContent = `Mostrando ${registrosFiltrados.length} de ${registros.length} registros`;
+	}
+
+	[filtroPersona, filtroTipo, filtroObra, filtroDesde, filtroHasta].forEach(function(filtro) {
+		filtro.addEventListener("input", mostrarRegistros);
+		filtro.addEventListener("change", mostrarRegistros);
+	});
+
+	function limpiarFiltros() {
+		filtroPersona.value = "";
+		filtroTipo.value = "";
+		filtroObra.value = "";
+		filtroDesde.value = "";
+		filtroHasta.value = "";
+		mostrarRegistros();
+	}
+
+	function exportarExcel() {
+		if (!registrosVisibles.length) {
+			alert("No hay registros para exportar.");
+			return;
+		}
+
+		const filas = registrosVisibles.map(function(registro) {
+			return [
+				registro.persona,
+				registro.tipo,
+				registro.obra || "",
+				registro.latitud,
+				registro.longitud,
+				new Date(registro.fecha_hora).toLocaleString("es-ES")
+			];
+		});
+		const contenido = [["Persona", "Movimiento", "Obra", "Latitud", "Longitud", "Fecha y hora"]]
+			.concat(filas)
+			.map(function(fila) { return fila.map(celda).join(";"); })
+			.join("\r\n");
+		const archivo = new Blob(["\uFEFF" + contenido], { type: "text/csv;charset=utf-8;" });
+		const enlace = document.createElement("a");
+		enlace.href = URL.createObjectURL(archivo);
+		enlace.download = "registros-movimientos.csv";
+		enlace.click();
+		URL.revokeObjectURL(enlace.href);
+	}
+
+	function celda(valor) {
+		return `"${String(valor == null ? "" : valor).replace(/"/g, '""')}"`;
+	}
+
+	function exportarPdf() {
+		if (!registrosVisibles.length) {
+			alert("No hay registros para exportar.");
+			return;
+		}
+		window.print();
+	}
+
+	async function cargarRegistros() {
+		try {
+			const respuesta = await fetch(URL_MOVIMIENTOS, {
+				method: "GET",
+				credentials: "include",
+				cache: "no-store"
+			});
+			const resultado = await respuesta.json();
+			if (!respuesta.ok || !resultado.exito) {
+				throw new Error(resultado.mensaje || "No se pudieron cargar los movimientos.");
+			}
+			registros = resultado.movimientos || [];
+			estadoFecha.textContent = "Registros cargados desde la base de datos.";
+			mostrarRegistros();
+		} catch (error) {
+			estadoFecha.textContent = error.message || "No se pudo conectar con la base de datos.";
+			registros = [];
+			mostrarRegistros();
+		}
+	}
+
+	cargarRegistros();
+
+	function escapar(valor) {
+		const elemento = document.createElement("span");
+		elemento.textContent = valor == null ? "" : valor;
+		return elemento.innerHTML;
+	}
+
+	function borrarRegistros() {
+		alert("Los registros se administran desde la base de datos.");
+	}
+</script>
+</body>
+</html>

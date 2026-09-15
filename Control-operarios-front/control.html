@@ -1,0 +1,473 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>Registro de Obra</title>
+
+    <style>
+        :root {
+            --azul: #31629a;
+            --amarillo: #f5c223;
+            --blanco: #ffffff;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            font-family: Arial, sans-serif;
+            background: #f4f5f7;
+            color: var(--azul);
+        }
+
+        .container {
+            max-width: 450px;
+            margin: 0 auto;
+            padding: 25px 20px;
+        }
+
+        h1 {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        .card {
+            background: var(--blanco);
+            padding: 20px;
+            border-radius: 15px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.08);
+            margin-bottom: 20px;
+        }
+
+        .label {
+            display: block;
+            font-weight: bold;
+            margin-bottom: 10px;
+            color: var(--azul);
+        }
+
+        button,
+        .camera-label {
+            width: 100%;
+            padding: 15px;
+            border: none;
+            border-radius: 10px;
+            background: var(--azul);
+            color: var(--blanco);
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            display: block;
+            text-align: center;
+        }
+
+        button:hover,
+        .camera-label:hover {
+            opacity: 0.9;
+        }
+
+        .status {
+            margin-top: 12px;
+            padding: 10px;
+            background: #f1f1f1;
+            border-radius: 8px;
+            font-size: 14px;
+            word-break: break-word;
+        }
+
+        #mapaUbicacion {
+            width: 100%;
+            height: 220px;
+            margin-top: 12px;
+            border: 0;
+            border-radius: 10px;
+            display: none;
+        }
+
+        #foto {
+            display: none;
+        }
+
+        #preview {
+            width: 100%;
+            margin-top: 15px;
+            border-radius: 10px;
+            display: none;
+        }
+
+        .enviar {
+            background: var(--amarillo);
+            color: var(--azul);
+            margin-top: 10px;
+        }
+
+        .cerrar-sesion {
+            background: #b83232;
+            margin-top: 18px;
+        }
+
+        .admin-link {
+            display: block;
+            margin-top: 18px;
+            color: var(--azul);
+            text-align: center;
+            font-size: 14px;
+        }
+
+        select,
+        input[type="text"] {
+            width: 100%;
+            padding: 13px;
+            border: 2px solid #d7e0eb;
+            border-radius: 8px;
+            color: #1f2f43;
+            font: inherit;
+        }
+    </style>
+</head>
+
+<body>
+
+<div class="container">
+
+    <h1>Registro de Obra</h1>
+
+    <!-- DATOS DEL MOVIMIENTO -->
+    <div class="card">
+        <span class="label">Persona</span>
+        <div id="personaSesion" class="status">Cargando usuario...</div>
+
+        <label class="label" for="tipoMovimiento" style="margin-top: 16px;">Tipo de movimiento</label>
+        <select id="tipoMovimiento">
+            <option value="ENTRADA">ENTRADA</option>
+            <option value="SALIDA">SALIDA</option>
+        </select>
+
+        <label class="label" for="obra" style="margin-top: 16px;">Obra</label>
+        <input type="text" id="obra" maxlength="150" placeholder="Ej. Alcaldía o Puerto Wilches" required>
+    </div>
+
+    <!-- UBICACIÓN -->
+    <div class="card">
+
+        <span class="label">📍 Ubicación</span>
+
+        <button type="button" onclick="obtenerUbicacion()">
+            Obtener ubicación
+        </button>
+
+        <div id="ubicacionStatus" class="status">
+            Ubicación no registrada
+        </div>
+
+        <iframe
+            id="mapaUbicacion"
+            title="Mapa de la ubicación obtenida"
+            loading="lazy"
+            referrerpolicy="no-referrer-when-downgrade"
+        ></iframe>
+
+    </div>
+
+
+    <!-- FOTO -->
+    <div class="card">
+
+        <span class="label">📷 Tomar foto</span>
+
+        <label for="foto" class="camera-label">
+            Abrir cámara
+        </label>
+
+        <!-- capture="environment" intenta abrir la cámara trasera -->
+        <input
+            type="file"
+            id="foto"
+            accept="image/*"
+            capture="environment"
+            onchange="mostrarFoto(event)"
+        >
+
+        <img id="preview">
+
+    </div>
+
+
+    <!-- ENVIAR -->
+    <button
+        type="button"
+        class="enviar"
+        onclick="enviarRegistro()"
+    >
+        ENVIAR
+    </button>
+
+    <button
+        type="button"
+        class="cerrar-sesion"
+        onclick="window.location.href = 'logout.html'"
+    >
+        CERRAR SESIÓN
+    </button>
+
+</div>
+
+
+<script>
+
+    const URL_MOVIMIENTOS = 'https://asistencia.rhelectronics.com.co/backend-control-operarios/controllers/movimientos.php';
+    let latitud = null;
+    let longitud = null;
+    let precision = null;
+    let fotoSeleccionada = null;
+    let fotoBase64 = null;
+    const usuarioSesion = JSON.parse(localStorage.getItem("usuarioSesion") || "null");
+
+    if (window.location.protocol === "file:") {
+            alert("Abre esta aplicación desde un servidor web para conservar la sesión.");
+        window.location.href = "login.html";
+    } else if (!usuarioSesion || !usuarioSesion.nombre_completo) {
+        alert("Debes iniciar sesión para registrar un movimiento.");
+        window.location.href = "login.html";
+    } else {
+        document.getElementById("personaSesion").textContent = usuarioSesion.nombre_completo;
+    }
+
+
+    // ==========================
+    // OBTENER UBICACIÓN
+    // ==========================
+
+    function obtenerUbicacion() {
+
+        const status = document.getElementById("ubicacionStatus");
+
+        if (!navigator.geolocation) {
+
+            status.innerHTML =
+                "❌ Este dispositivo no soporta geolocalización.";
+
+            return;
+        }
+
+        status.innerHTML =
+            "📍 Obteniendo ubicación...";
+
+        navigator.geolocation.getCurrentPosition(
+
+            function(position) {
+
+                latitud = position.coords.latitude;
+                longitud = position.coords.longitude;
+                precision = position.coords.accuracy;
+
+                const mapa = document.getElementById("mapaUbicacion");
+                const margen = 0.005;
+                const bbox = [
+                    longitud - margen,
+                    latitud - margen,
+                    longitud + margen,
+                    latitud + margen
+                ].join("%2C");
+
+                mapa.src =
+                    `https://www.openstreetmap.org/export/embed.html?bbox=${bbox}&layer=mapnik&marker=${latitud}%2C${longitud}`;
+                mapa.style.display = "block";
+
+                status.innerHTML = `
+                    <strong>Ubicación obtenida</strong><br><br>
+
+                    Latitud: ${latitud}<br>
+
+                    Longitud: ${longitud}<br>
+
+                    Precisión: ${precision.toFixed(2)} metros
+                `;
+
+            },
+
+            function(error) {
+
+                switch(error.code) {
+
+                    case error.PERMISSION_DENIED:
+
+                        status.innerHTML =
+                            "❌ Debes permitir el acceso a la ubicación.";
+
+                        break;
+
+                    case error.POSITION_UNAVAILABLE:
+
+                        status.innerHTML =
+                            "❌ No se pudo obtener la ubicación.";
+
+                        break;
+
+                    case error.TIMEOUT:
+
+                        status.innerHTML =
+                            "❌ Tiempo de espera agotado.";
+
+                        break;
+
+                    default:
+
+                        status.innerHTML =
+                            "❌ Error desconocido.";
+
+                }
+
+            },
+
+            {
+                enableHighAccuracy: true,
+                timeout: 10000,
+                maximumAge: 0
+            }
+
+        );
+    }
+
+
+    // ==========================
+    // TOMAR FOTO
+    // ==========================
+
+    function mostrarFoto(event) {
+
+        const archivo = event.target.files[0];
+
+        if (!archivo) {
+            return;
+        }
+
+        fotoSeleccionada = archivo;
+
+        const preview = document.getElementById("preview");
+
+        preview.src = URL.createObjectURL(archivo);
+
+        preview.style.display = "block";
+
+        const lector = new FileReader();
+        lector.onload = function() {
+            fotoBase64 = lector.result;
+        };
+        lector.readAsDataURL(archivo);
+    }
+
+
+    // ==========================
+    // ENVIAR
+    // ==========================
+
+    async function enviarRegistro() {
+
+        const persona = usuarioSesion.nombre_completo;
+        const obra = document.getElementById("obra").value.trim();
+        const tipo = document.getElementById("tipoMovimiento").value;
+        const botonEnviar = document.querySelector(".enviar");
+
+        if (!obra) {
+            alert("Escribe la obra.");
+            return;
+        }
+
+        if (latitud === null || longitud === null) {
+
+            alert("Primero debes obtener la ubicación.");
+
+            return;
+        }
+
+        if (!fotoSeleccionada) {
+
+            alert("Primero debes tomar una foto.");
+
+            return;
+        }
+
+        if (!fotoBase64) {
+            alert("Espera un momento mientras se prepara la fotografía.");
+            return;
+        }
+
+        botonEnviar.disabled = true;
+        botonEnviar.textContent = "ENVIANDO...";
+
+        const datos = new FormData();
+        datos.append("movimiento", tipo);
+        datos.append("obra", obra);
+        datos.append("latitud", String(latitud));
+        datos.append("longitud", String(longitud));
+        datos.append("fotografia", fotoSeleccionada);
+
+        try {
+            const respuesta = await fetch(URL_MOVIMIENTOS, {
+                method: "POST",
+                body: datos,
+                credentials: "include"
+            });
+            const resultado = await respuesta.json();
+
+            if (!respuesta.ok || !resultado.exito) {
+                if (respuesta.status === 401) {
+                    throw new Error("La sesión del servidor no está activa. Vuelve a iniciar sesión desde esta misma dirección.");
+                }
+                throw new Error(resultado.mensaje || "No se pudo guardar el movimiento.");
+            }
+
+            const fechaServidor = await obtenerFechaServidor();
+            const registros = JSON.parse(localStorage.getItem("registrosMovimientos") || "[]");
+
+            registros.unshift({
+                id: resultado.movimiento_id,
+                persona: persona,
+                tipo: tipo,
+                obra: obra,
+                latitud: latitud,
+                longitud: longitud,
+                precision: precision,
+                foto: fotoBase64,
+                fechaHora: fechaServidor.fecha,
+                fuenteFecha: fechaServidor.fuente
+            });
+
+            localStorage.setItem("registrosMovimientos", JSON.stringify(registros));
+            alert("Movimiento guardado correctamente.");
+            window.location.reload();
+        } catch (error) {
+            alert(error.message || "No se pudo conectar con el servidor.");
+            botonEnviar.disabled = false;
+            botonEnviar.textContent = "ENVIAR";
+        }
+    }
+
+
+    async function obtenerFechaServidor() {
+        try {
+            const respuesta = await fetch(window.location.href, {
+                method: "HEAD",
+                cache: "no-store"
+            });
+            const fecha = respuesta.headers.get("Date");
+
+            if (fecha) {
+                return { fecha: new Date(fecha).toISOString(), fuente: "servidor" };
+            }
+        } catch (error) {
+            // En file:// no existe un servidor del que leer la fecha.
+        }
+
+        return { fecha: new Date().toISOString(), fuente: "dispositivo" };
+    }
+
+</script>
+
+</body>
+</html>

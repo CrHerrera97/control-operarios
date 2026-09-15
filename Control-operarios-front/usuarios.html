@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Usuarios | Control de operarios</title>
+    <style>
+        :root { --azul: #31629a; --azul-oscuro: #233b5a; --amarillo: #f5c223; --blanco: #fff; --gris: #657386; --rojo: #b83232; --verde: #227447; }
+        * { box-sizing: border-box; }
+        body { margin: 0; padding: 28px; background: #f4f5f7; color: #1f2f43; font-family: Arial, sans-serif; }
+        main { max-width: 1180px; margin: 0 auto; }
+        header { display: flex; align-items: center; justify-content: space-between; gap: 18px; margin-bottom: 24px; }
+        h1 { margin: 0; color: var(--azul); }
+        h2 { margin: 0 0 18px; color: var(--azul-oscuro); font-size: 20px; }
+        .acciones-header, .acciones-fila { display: flex; flex-wrap: wrap; gap: 8px; }
+        a, button { border: 0; border-radius: 7px; padding: 11px 15px; color: var(--blanco); font: inherit; font-weight: bold; text-decoration: none; cursor: pointer; }
+        a { background: var(--azul); }
+        button { background: var(--azul); }
+        button:hover, a:hover { opacity: .88; }
+        button:disabled { cursor: wait; opacity: .65; }
+        .secundario { background: var(--gris); }
+        .peligro { background: var(--rojo); }
+        .exito { background: var(--verde); }
+        .panel { margin-bottom: 18px; padding: 20px; background: var(--blanco); border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,.07); }
+        .barra { display: flex; align-items: end; justify-content: space-between; gap: 14px; }
+        .barra label, .campo { display: flex; flex-direction: column; gap: 7px; color: var(--azul); font-size: 13px; font-weight: bold; }
+        .barra label { flex: 1; }
+        input, select { width: 100%; min-height: 42px; padding: 10px 11px; border: 2px solid #d7e0eb; border-radius: 7px; color: #1f2f43; font: inherit; }
+        input:focus, select:focus { border-color: var(--azul); outline: none; box-shadow: 0 0 0 3px rgba(245,194,35,.25); }
+        .contador, .estado { margin: 12px 0 0; color: var(--gris); font-size: 14px; }
+        .estado.error { color: var(--rojo); }
+        .tabla-contenedor { overflow-x: auto; }
+        table { width: 100%; min-width: 760px; border-collapse: collapse; }
+        th, td { padding: 13px 11px; border-bottom: 1px solid #e5e9ef; text-align: left; vertical-align: middle; }
+        th { background: var(--azul); color: var(--blanco); white-space: nowrap; }
+        tr:last-child td { border-bottom: 0; }
+        .rol, .estado-usuario { display: inline-block; padding: 5px 9px; border-radius: 999px; font-size: 12px; font-weight: bold; }
+        .rol { background: #e7eef8; color: var(--azul); }
+        .activo { background: #e1f2e9; color: var(--verde); }
+        .inactivo { background: #f8e4e4; color: var(--rojo); }
+        .vacio { padding: 30px; color: var(--gris); text-align: center; }
+        dialog { width: min(100% - 28px, 520px); padding: 0; border: 0; border-radius: 12px; box-shadow: 0 20px 60px rgba(20,45,80,.3); }
+        dialog::backdrop { background: rgba(31,47,67,.55); }
+        .modal { padding: 24px; }
+        .formulario { display: grid; gap: 15px; }
+        .ayuda { margin: -3px 0 0; color: var(--gris); font-size: 12px; font-weight: normal; }
+        .acciones-modal { display: flex; justify-content: flex-end; gap: 9px; margin-top: 5px; }
+        .mensaje-formulario { min-height: 18px; margin: 0; color: var(--rojo); font-size: 14px; }
+        @media (max-width: 650px) { body { padding: 18px 12px; } header, .barra { align-items: stretch; flex-direction: column; } h1 { font-size: 25px; } .acciones-header { width: 100%; } .acciones-header a { flex: 1; text-align: center; } }
+    </style>
+</head>
+<body>
+<main>
+    <header>
+        <h1>Gestión de usuarios</h1>
+        <div class="acciones-header">
+            <a href="admin.html">Ver movimientos</a>
+            <button class="secundario" type="button" id="cerrarSesion">Cerrar sesión</button>
+        </div>
+    </header>
+
+    <section class="panel">
+        <div class="barra">
+            <label for="buscarUsuario">Buscar usuario
+                <input type="search" id="buscarUsuario" placeholder="Nombre o usuario">
+            </label>
+            <button class="exito" type="button" id="nuevoUsuario">+ Nuevo usuario</button>
+        </div>
+        <p class="contador" id="contadorUsuarios">Cargando usuarios...</p>
+        <p class="estado" id="estadoPagina" role="status" aria-live="polite"></p>
+    </section>
+
+    <section class="panel tabla-contenedor">
+        <table>
+            <thead><tr><th>Nombre completo</th><th>Usuario</th><th>Rol</th><th>Estado</th><th>Creado</th><th>Acciones</th></tr></thead>
+            <tbody id="listaUsuarios"></tbody>
+        </table>
+        <div class="vacio" id="usuariosVacios" hidden>No hay usuarios que coincidan con la búsqueda.</div>
+    </section>
+</main>
+
+<dialog id="dialogoUsuario">
+    <div class="modal">
+        <h2 id="tituloFormulario">Nuevo usuario</h2>
+        <form class="formulario" id="formularioUsuario">
+            <label class="campo" for="nombreCompleto">Nombre completo
+                <input id="nombreCompleto" name="nombre_completo" maxlength="150" required>
+            </label>
+            <label class="campo" for="nombreUsuario">Usuario
+                <input id="nombreUsuario" name="usuario" maxlength="50" autocomplete="username" required>
+            </label>
+            <label class="campo" for="rol">Rol
+                <select id="rol" name="rol"><option value="OPERARIO">OPERARIO</option><option value="ADMIN">ADMIN</option></select>
+            </label>
+            <label class="campo" for="contrasena">Contraseña
+                <input id="contrasena" name="contrasena" type="password" minlength="6" autocomplete="new-password">
+                <span class="ayuda" id="ayudaContrasena">Mínimo 6 caracteres.</span>
+            </label>
+            <p class="mensaje-formulario" id="mensajeFormulario" role="alert"></p>
+            <div class="acciones-modal">
+                <button class="secundario" type="button" id="cancelarFormulario">Cancelar</button>
+                <button class="exito" type="submit" id="guardarUsuario">Guardar usuario</button>
+            </div>
+        </form>
+    </div>
+</dialog>
+
+<script>
+    const URL_USUARIOS = 'https://asistencia.rhelectronics.com.co/backend-control-operarios/controllers/usuarios.php';
+    const sesion = JSON.parse(localStorage.getItem('usuarioSesion') || 'null');
+    const listaUsuarios = document.getElementById('listaUsuarios');
+    const usuariosVacios = document.getElementById('usuariosVacios');
+    const contadorUsuarios = document.getElementById('contadorUsuarios');
+    const estadoPagina = document.getElementById('estadoPagina');
+    const buscarUsuario = document.getElementById('buscarUsuario');
+    const dialogoUsuario = document.getElementById('dialogoUsuario');
+    const formularioUsuario = document.getElementById('formularioUsuario');
+    const mensajeFormulario = document.getElementById('mensajeFormulario');
+    const tituloFormulario = document.getElementById('tituloFormulario');
+    const contrasena = document.getElementById('contrasena');
+    const ayudaContrasena = document.getElementById('ayudaContrasena');
+    let usuarios = [];
+    let usuarioEditando = null;
+
+    if (!sesion || sesion.rol !== 'ADMIN') {
+        window.location.replace('login.html');
+    }
+
+    function pintarUsuarios() {
+        const busqueda = buscarUsuario.value.trim().toLocaleLowerCase();
+        const visibles = usuarios.filter(function(usuario) {
+            return [usuario.nombre_completo, usuario.usuario].some(function(valor) {
+                return String(valor).toLocaleLowerCase().includes(busqueda);
+            });
+        });
+        listaUsuarios.innerHTML = '';
+        visibles.forEach(function(usuario) {
+            const fila = document.createElement('tr');
+            fila.innerHTML = `
+                <td>${escapar(usuario.nombre_completo)}</td>
+                <td>${escapar(usuario.usuario)}</td>
+                <td><span class="rol">${escapar(usuario.rol)}</span></td>
+                <td><span class="estado-usuario ${Number(usuario.activo) ? 'activo' : 'inactivo'}">${Number(usuario.activo) ? 'Activo' : 'Inactivo'}</span></td>
+                <td>${formatearFecha(usuario.creado_en)}</td>
+                <td><div class="acciones-fila">
+                    <button type="button" data-accion="editar" data-id="${usuario.id}">Editar</button>
+                    <button type="button" class="secundario" data-accion="estado" data-id="${usuario.id}">${Number(usuario.activo) ? 'Desactivar' : 'Activar'}</button>
+                    <button type="button" class="peligro" data-accion="eliminar" data-id="${usuario.id}">Eliminar</button>
+                </div></td>`;
+            listaUsuarios.appendChild(fila);
+        });
+        usuariosVacios.hidden = visibles.length > 0;
+        contadorUsuarios.textContent = `Mostrando ${visibles.length} de ${usuarios.length} usuarios`;
+    }
+
+    async function cargarUsuarios() {
+        try {
+            const respuesta = await solicitar('', { method: 'GET' });
+            usuarios = respuesta.usuarios || [];
+            estadoPagina.textContent = '';
+            pintarUsuarios();
+        } catch (error) {
+            estadoPagina.textContent = error.message;
+            estadoPagina.className = 'estado error';
+            contadorUsuarios.textContent = 'No se pudieron cargar los usuarios.';
+        }
+    }
+
+    async function solicitar(id, opciones) {
+        const respuesta = await fetch(`${URL_USUARIOS}${id ? `?id=${encodeURIComponent(id)}` : ''}`, { credentials: 'include', cache: 'no-store', ...opciones });
+        const resultado = respuesta.status === 204 ? {} : await respuesta.json();
+        if (respuesta.status === 401 || respuesta.status === 403) {
+            window.location.replace('login.html');
+        }
+        if (!respuesta.ok || resultado.exito === false) {
+            throw new Error(resultado.mensaje || 'No se pudo completar la operación.');
+        }
+        return resultado;
+    }
+
+    function abrirFormulario(usuario) {
+        usuarioEditando = usuario;
+        tituloFormulario.textContent = usuario ? 'Editar usuario' : 'Nuevo usuario';
+        document.getElementById('nombreCompleto').value = usuario ? usuario.nombre_completo : '';
+        document.getElementById('nombreUsuario').value = usuario ? usuario.usuario : '';
+        document.getElementById('rol').value = usuario ? usuario.rol : 'OPERARIO';
+        contrasena.value = '';
+        contrasena.required = !usuario;
+        ayudaContrasena.textContent = usuario ? 'Déjala vacía para conservar la contraseña actual.' : 'Mínimo 6 caracteres.';
+        mensajeFormulario.textContent = '';
+        dialogoUsuario.showModal();
+    }
+
+    formularioUsuario.addEventListener('submit', async function(evento) {
+        evento.preventDefault();
+        const boton = document.getElementById('guardarUsuario');
+        const datos = Object.fromEntries(new FormData(formularioUsuario));
+        if (!datos.contrasena) delete datos.contrasena;
+        boton.disabled = true;
+        mensajeFormulario.textContent = '';
+        try {
+            if (usuarioEditando) {
+                await solicitar(usuarioEditando.id, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(datos) });
+            } else {
+                await solicitar('', { method: 'POST', body: new URLSearchParams(datos) });
+            }
+            dialogoUsuario.close();
+            estadoPagina.className = 'estado';
+            estadoPagina.textContent = usuarioEditando ? 'Usuario actualizado correctamente.' : 'Usuario creado correctamente.';
+            await cargarUsuarios();
+        } catch (error) {
+            mensajeFormulario.textContent = error.message;
+        } finally {
+            boton.disabled = false;
+        }
+    });
+
+    listaUsuarios.addEventListener('click', async function(evento) {
+        const boton = evento.target.closest('button[data-id]');
+        if (!boton) return;
+        const usuario = usuarios.find(function(elemento) { return String(elemento.id) === boton.dataset.id; });
+        if (!usuario) return;
+        if (boton.dataset.accion === 'editar') {
+            abrirFormulario(usuario);
+            return;
+        }
+        if (boton.dataset.accion === 'eliminar') {
+            if (!confirm(`¿Eliminar a ${usuario.nombre_completo}? Esta acción no se puede deshacer.`)) return;
+            try {
+                await solicitar(usuario.id, { method: 'DELETE' });
+                await cargarUsuarios();
+                estadoPagina.textContent = 'Usuario eliminado correctamente.';
+            } catch (error) { estadoPagina.textContent = error.message; estadoPagina.className = 'estado error'; }
+            return;
+        }
+        try {
+            await solicitar(usuario.id, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ activo: !Number(usuario.activo) }) });
+            await cargarUsuarios();
+        } catch (error) { estadoPagina.textContent = error.message; estadoPagina.className = 'estado error'; }
+    });
+
+    document.getElementById('nuevoUsuario').addEventListener('click', function() { abrirFormulario(null); });
+    document.getElementById('cancelarFormulario').addEventListener('click', function() { dialogoUsuario.close(); });
+    document.getElementById('cerrarSesion').addEventListener('click', function() { window.location.href = 'logout.html'; });
+    buscarUsuario.addEventListener('input', pintarUsuarios);
+
+    function escapar(valor) {
+        const elemento = document.createElement('span');
+        elemento.textContent = valor == null ? '' : valor;
+        return elemento.innerHTML;
+    }
+
+    function formatearFecha(valor) {
+        const fecha = new Date(String(valor).replace(' ', 'T'));
+        return Number.isNaN(fecha.getTime()) ? '-' : fecha.toLocaleDateString('es-ES');
+    }
+
+    cargarUsuarios();
+</script>
+</body>
+</html>
