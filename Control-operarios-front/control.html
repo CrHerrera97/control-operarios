@@ -229,11 +229,9 @@
     const usuarioSesion = JSON.parse(localStorage.getItem("usuarioSesion") || "null");
 
     if (window.location.protocol === "file:") {
-            alert("Abre esta aplicación desde un servidor web para conservar la sesión.");
-        window.location.href = "login.html";
+        window.location.replace("login.html");
     } else if (!usuarioSesion || !usuarioSesion.nombre_completo) {
-        alert("Debes iniciar sesión para registrar un movimiento.");
-        window.location.href = "login.html";
+        window.location.replace("login.html");
     } else {
         document.getElementById("personaSesion").textContent = usuarioSesion.nombre_completo;
         document.getElementById("obraActual").textContent = "Cargando obra...";

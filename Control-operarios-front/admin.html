@@ -106,6 +106,10 @@
 </main>
 <script>
 	const URL_MOVIMIENTOS = 'https://asistencia.rhelectronics.com.co/backend-control-operarios/controllers/movimientos.php';
+	const sesion = JSON.parse(localStorage.getItem('usuarioSesion') || 'null');
+	if (!sesion || sesion.rol !== 'ADMIN') {
+		window.location.replace('login.html');
+	}
 	const cuerpo = document.getElementById("registros");
 	const vacio = document.getElementById("vacio");
 	const estadoFecha = document.getElementById("estadoFecha");
