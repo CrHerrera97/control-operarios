@@ -11,8 +11,10 @@
 		main { max-width: 1400px; margin: 0 auto; }
 		header { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 24px; }
 		h1 { margin: 0; color: var(--azul); }
+		.acciones-header { display: flex; flex-wrap: wrap; gap: 8px; }
 		a, button { border: 0; border-radius: 8px; padding: 12px 16px; background: var(--azul); color: var(--blanco); font: inherit; font-weight: bold; text-decoration: none; cursor: pointer; }
 		button { background: #b83232; }
+		.cerrar-sesion { background: #657386; }
 		.eliminar-registro { padding: 12px 16px; font: inherit; white-space: nowrap; }
 		.tabla-contenedor { overflow-x: auto; background: var(--blanco); border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,.08); }
 		table { width: 100%; min-width: 980px; border-collapse: collapse; }
@@ -53,8 +55,9 @@
 <main>
 	<header>
 		<h1>Registro de movimientos</h1>
-		<div>
+		<div class="acciones-header">
 			<a href="usuarios.html">Gestionar usuarios</a>
+			<button class="cerrar-sesion" type="button" onclick="window.location.href = 'logout.html'">Cerrar sesión</button>
 		</div>
 	</header>
 	<p class="nota" id="estadoFecha"></p>
