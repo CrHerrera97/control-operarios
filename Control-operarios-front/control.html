@@ -242,6 +242,8 @@
 
     async function cargarEstadoObraActual() {
         const obraActual = document.getElementById("obraActual");
+        const tipoMovimiento = document.getElementById("tipoMovimiento");
+        const obra = document.getElementById("obra");
 
         try {
             const respuesta = await fetch(URL_MOVIMIENTOS, {
@@ -258,12 +260,23 @@
             const movimientoActual = resultado.movimientoActual;
 
             if (!movimientoActual || movimientoActual.movimiento !== "ENTRADA") {
+                tipoMovimiento.innerHTML = '<option value="ENTRADA">ENTRADA</option>';
+                tipoMovimiento.value = "ENTRADA";
+                obra.value = "";
+                obra.readOnly = false;
                 obraActual.textContent = "Actualmente no se encuentra en ninguna obra.";
                 return;
             }
 
+            tipoMovimiento.innerHTML = '<option value="SALIDA">SALIDA</option>';
+            tipoMovimiento.value = "SALIDA";
+            obra.value = movimientoActual.obra;
+            obra.readOnly = true;
             obraActual.textContent = `Obra actual: ${movimientoActual.obra}`;
         } catch (error) {
+            tipoMovimiento.innerHTML = '<option value="ENTRADA">ENTRADA</option>';
+            tipoMovimiento.value = "ENTRADA";
+            obra.readOnly = false;
             obraActual.textContent = "No se pudo consultar la obra actual.";
         }
     }
