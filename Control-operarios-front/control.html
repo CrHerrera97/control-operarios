@@ -397,6 +397,35 @@
     // ENVIAR
     // ==========================
 
+    function comprimirFotografia(archivo) {
+        return new Promise((resolver, rechazar) => {
+            const imagen = new Image();
+            const lector = new FileReader();
+
+            lector.onload = () => {
+                imagen.onload = () => {
+                    const maximo = 1280;
+                    const escala = Math.min(1, maximo / Math.max(imagen.width, imagen.height));
+                    const lienzo = document.createElement("canvas");
+                    lienzo.width = Math.max(1, Math.round(imagen.width * escala));
+                    lienzo.height = Math.max(1, Math.round(imagen.height * escala));
+                    lienzo.getContext("2d").drawImage(imagen, 0, 0, lienzo.width, lienzo.height);
+                    lienzo.toBlob((blob) => {
+                        if (!blob) {
+                            rechazar(new Error("No se pudo preparar la fotografía."));
+                            return;
+                        }
+                        resolver(new File([blob], "fotografia.jpg", { type: "image/jpeg" }));
+                    }, "image/jpeg", 0.8);
+                };
+                imagen.onerror = () => rechazar(new Error("La fotografía no es válida."));
+                imagen.src = lector.result;
+            };
+            lector.onerror = () => rechazar(new Error("No se pudo leer la fotografía."));
+            lector.readAsDataURL(archivo);
+        });
+    }
+
     async function enviarRegistro() {
 
         const persona = usuarioSesion.nombre_completo;
@@ -429,16 +458,18 @@
         }
 
         botonEnviar.disabled = true;
-        botonEnviar.textContent = "ENVIANDO...";
-
-        const datos = new FormData();
-        datos.append("movimiento", tipo);
-        datos.append("obra", obra);
-        datos.append("latitud", String(latitud));
-        datos.append("longitud", String(longitud));
-        datos.append("fotografia", fotoSeleccionada);
+        botonEnviar.textContent = "PREPARANDO...";
 
         try {
+            const fotografiaOptimizada = await comprimirFotografia(fotoSeleccionada);
+            const datos = new FormData();
+            datos.append("movimiento", tipo);
+            datos.append("obra", obra);
+            datos.append("latitud", String(latitud));
+            datos.append("longitud", String(longitud));
+            datos.append("fotografia", fotografiaOptimizada);
+
+            botonEnviar.textContent = "ENVIANDO...";
             const respuesta = await fetch(URL_MOVIMIENTOS, {
                 method: "POST",
                 body: datos,
