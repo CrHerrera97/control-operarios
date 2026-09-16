@@ -140,6 +140,7 @@
     <div class="card">
         <span class="label">Persona</span>
         <div id="personaSesion" class="status">Cargando usuario...</div>
+        <div id="obraActual" class="status" style="margin-top: 10px;">Cargando obra...</div>
 
         <label class="label" for="tipoMovimiento" style="margin-top: 16px;">Tipo de movimiento</label>
         <select id="tipoMovimiento">
@@ -235,6 +236,36 @@
         window.location.href = "login.html";
     } else {
         document.getElementById("personaSesion").textContent = usuarioSesion.nombre_completo;
+        document.getElementById("obraActual").textContent = "Cargando obra...";
+        cargarEstadoObraActual();
+    }
+
+    async function cargarEstadoObraActual() {
+        const obraActual = document.getElementById("obraActual");
+
+        try {
+            const respuesta = await fetch(URL_MOVIMIENTOS, {
+                method: "GET",
+                credentials: "include",
+                cache: "no-store"
+            });
+            const resultado = await respuesta.json();
+
+            if (!respuesta.ok || !resultado.exito) {
+                throw new Error(resultado.mensaje || "No se pudo consultar la obra actual.");
+            }
+
+            const movimientoActual = resultado.movimientoActual;
+
+            if (!movimientoActual || movimientoActual.movimiento !== "ENTRADA") {
+                obraActual.textContent = "Actualmente no se encuentra en ninguna obra.";
+                return;
+            }
+
+            obraActual.textContent = `Obra actual: ${movimientoActual.obra}`;
+        } catch (error) {
+            obraActual.textContent = "No se pudo consultar la obra actual.";
+        }
     }
 
 
@@ -422,23 +453,6 @@
                 throw new Error(resultado.mensaje || "No se pudo guardar el movimiento.");
             }
 
-            const fechaServidor = await obtenerFechaServidor();
-            const registros = JSON.parse(localStorage.getItem("registrosMovimientos") || "[]");
-
-            registros.unshift({
-                id: resultado.movimiento_id,
-                persona: persona,
-                tipo: tipo,
-                obra: obra,
-                latitud: latitud,
-                longitud: longitud,
-                precision: precision,
-                foto: fotoBase64,
-                fechaHora: fechaServidor.fecha,
-                fuenteFecha: fechaServidor.fuente
-            });
-
-            localStorage.setItem("registrosMovimientos", JSON.stringify(registros));
             alert("Movimiento guardado correctamente.");
             window.location.reload();
         } catch (error) {

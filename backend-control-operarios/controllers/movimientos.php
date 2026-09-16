@@ -144,6 +144,27 @@ class MovimientosController
         return $consulta->fetchAll();
     }
 
+    public function obtenerUltimoMovimientoUsuario(int $usuarioId): ?array
+    {
+        if ($usuarioId <= 0) {
+            throw new InvalidArgumentException('El ID de usuario no es válido.');
+        }
+
+        $consulta = $this->pdo->prepare(
+            'SELECT id, usuario_id, movimiento, obra, latitud, longitud,
+                    TO_BASE64(fotografia) AS fotografia, fecha_hora
+             FROM movimientos
+             WHERE usuario_id = :usuario_id
+             ORDER BY fecha_hora DESC, id DESC
+             LIMIT 1'
+        );
+        $consulta->bindValue(':usuario_id', $usuarioId, PDO::PARAM_INT);
+        $consulta->execute();
+
+        $resultado = $consulta->fetch();
+        return $resultado === false ? null : $resultado;
+    }
+
     public function buscarPorId(int $movimientoId): ?array
     {
         if ($movimientoId <= 0) {
@@ -287,11 +308,20 @@ if (in_array($_SERVER['REQUEST_METHOD'], ['POST', 'GET', 'PUT', 'DELETE'], true)
             http_response_code(201);
             $respuesta = ['exito' => true, 'mensaje' => 'Movimiento registrado correctamente.', 'movimiento_id' => $movimientoId];
         } elseif ($metodo === 'GET') {
-            $autenticacion->exigirAdministrador();
+            $usuarioSesion = $autenticacion->exigirSesion();
             if ($movimientoId <= 0) {
+                if (($usuarioSesion['rol'] ?? '') === 'ADMIN') {
+                    $respuesta = [
+                        'exito' => true,
+                        'movimientos' => $controlador->listarMovimientos()
+                    ];
+                    echo json_encode($respuesta, JSON_UNESCAPED_UNICODE);
+                    exit;
+                }
+
                 $respuesta = [
                     'exito' => true,
-                    'movimientos' => $controlador->listarMovimientos()
+                    'movimientoActual' => $controlador->obtenerUltimoMovimientoUsuario((int) $usuarioSesion['id'])
                 ];
                 echo json_encode($respuesta, JSON_UNESCAPED_UNICODE);
                 exit;
