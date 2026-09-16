@@ -13,6 +13,7 @@
 		h1 { margin: 0; color: var(--azul); }
 		a, button { border: 0; border-radius: 8px; padding: 12px 16px; background: var(--azul); color: var(--blanco); font: inherit; font-weight: bold; text-decoration: none; cursor: pointer; }
 		button { background: #b83232; }
+		.eliminar-registro { padding: 12px 16px; font: inherit; white-space: nowrap; }
 		.tabla-contenedor { overflow-x: auto; background: var(--blanco); border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,.08); }
 		table { width: 100%; min-width: 980px; border-collapse: collapse; }
 		th, td { padding: 14px 12px; border-bottom: 1px solid rgba(119, 134, 156, 0.35); text-align: left; vertical-align: middle; }
@@ -22,7 +23,7 @@
 		.movimiento { font-weight: bold; }
 		.entrada { color: #227447; }
 		.salida { color: #b83232; }
-		.foto { width: 82px; height: 62px; border-radius: 6px; object-fit: cover; display: block; cursor: pointer; transition: transform .2s ease; border: 1px solid rgba(49, 98, 154, 0.18); }
+		.foto { width: 120px; height: 90px; border-radius: 6px; object-fit: cover; display: block; cursor: pointer; transition: transform .2s ease; border: 1px solid rgba(49, 98, 154, 0.18); }
 		.foto:hover { transform: scale(1.03); }
 		.foto-link { display: inline-flex; align-items: center; justify-content: center; border-radius: 8px; background: #fff; }
 		.mapa-enlace { white-space: nowrap; }
@@ -42,7 +43,7 @@
 		.exportar { display: flex; gap: 10px; margin-bottom: 18px; }
 		.exportar button { background: #227447; }
 		.exportar .pdf { background: #b83232; }
-		@media print { body { padding: 0; background: #fff; } header, .filtros, .nota, .resultados, .exportar { display: none; } .tabla-contenedor { box-shadow: none; } table { min-width: 0; font-size: 10px; } .foto { width: 58px; height: 44px; } }
+		@media print { body { padding: 0; background: #fff; } header, .filtros, .nota, .resultados, .exportar { display: none; } .tabla-contenedor { box-shadow: none; } table { min-width: 0; font-size: 10px; } .foto { width: 80px; height: 60px; } }
 		@media (max-width: 620px) { body { padding: 18px 12px; } header { align-items: flex-start; flex-direction: column; } h1 { font-size: 25px; } }
 		@media (max-width: 900px) { .filtros { grid-template-columns: repeat(2, 1fr); } .limpiar { align-self: center; } }
 		@media (max-width: 480px) { .filtros { grid-template-columns: 1fr; } .limpiar { width: 100%; } }
@@ -87,7 +88,7 @@
 	<section class="tabla-contenedor">
 		<table>
 			<thead>
-				<tr><th>Persona</th><th>Movimiento</th><th>Obra</th><th>Latitud</th><th>Longitud</th><th>Mapa</th><th>Fotografía</th><th>Fecha y hora</th></tr>
+				<tr><th>Persona</th><th>Movimiento</th><th>Obra</th><th>Latitud</th><th>Longitud</th><th>Mapa</th><th>Fotografía</th><th>Fecha y hora</th><th>Acción</th></tr>
 			</thead>
 			<tbody id="registros"></tbody>
 		</table>
@@ -144,7 +145,8 @@
 			<td>${Number(registro.longitud).toFixed(6)}</td>
 			<td><a class="mapa-enlace" href="https://www.google.com/maps?q=${Number(registro.latitud)},${Number(registro.longitud)}" target="_blank" rel="noopener noreferrer">Ver mapa</a></td>
 			<td><a class="foto-link" href="#" data-imagen="${fotoSrc}" aria-label="Ver foto de ${escapar(registro.persona)}"><img class="foto" src="${fotoSrc}" alt="Foto de ${escapar(registro.persona)}"></a></td>
-			<td>${new Date(registro.fecha_hora).toLocaleString("es-ES")}</td>`;
+			<td>${new Date(registro.fecha_hora).toLocaleString("es-ES")}</td>
+			<td><button class="eliminar-registro" type="button" data-id="${Number(registro.id)}" data-persona="${escapar(registro.persona)}">Eliminar</button></td>`;
 		cuerpo.appendChild(fila);
 		});
 
@@ -153,6 +155,13 @@
 			enlace.addEventListener("click", function(evento) {
 				evento.preventDefault();
 				abrirFoto(this.dataset.imagen);
+			});
+		});
+
+		const botonesEliminar = document.querySelectorAll(".eliminar-registro");
+		botonesEliminar.forEach(function(boton) {
+			boton.addEventListener("click", function() {
+				eliminarRegistro(Number(this.dataset.id), this.dataset.persona);
 			});
 		});
 
@@ -270,8 +279,25 @@
 		return elemento.innerHTML;
 	}
 
-	function borrarRegistros() {
-		alert("Los registros se administran desde la base de datos.");
+	async function eliminarRegistro(registroId, persona) {
+		if (!registroId || !confirm(`¿Eliminar el registro de ${persona}? Esta acción no se puede deshacer.`)) return;
+
+		try {
+			const respuesta = await fetch(`${URL_MOVIMIENTOS}?id=${registroId}`, {
+				method: "DELETE",
+				credentials: "include"
+			});
+			const resultado = await respuesta.json();
+			if (!respuesta.ok || !resultado.exito) {
+				throw new Error(resultado.mensaje || "No se pudo eliminar el registro.");
+			}
+			registros = registros.filter(function(registro) {
+				return Number(registro.id) !== registroId;
+			});
+			mostrarRegistros();
+		} catch (error) {
+			alert(error.message || "No se pudo eliminar el registro.");
+		}
 	}
 </script>
 </body>
