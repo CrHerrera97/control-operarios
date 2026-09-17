@@ -146,7 +146,7 @@ class MovimientosController
                     && (int) $ultimoMovimientoDispositivo['usuario_id'] !== $usuarioId
                 ) {
                     throw new InvalidArgumentException(
-                        'Este dispositivo ya tiene una entrada abierta con otro usuario. Debe registrarse primero la salida.'
+                        'Este dispositivo ya tiene una entrada abierta con otro usuario.'
                     );
                 }
             }
