@@ -40,7 +40,9 @@ class MovimientosController
         string $obra,
         string $latitud,
         string $longitud,
-        string $fotografia
+        string $fotografia,
+        ?string $ipAddress,
+        ?string $dispositivoId
     ): int {
         if ($usuarioId <= 0) {
             throw new InvalidArgumentException('El ID de usuario no es válido.');
@@ -101,11 +103,35 @@ class MovimientosController
                 throw new InvalidArgumentException('No hay una entrada previa para registrar la salida.');
             }
 
+            if ($movimiento === 'ENTRADA' && $dispositivoId !== null) {
+                $consultaDispositivo = $this->pdo->prepare(
+                    'SELECT usuario_id, movimiento
+                     FROM movimientos
+                     WHERE dispositivo_id = :dispositivo_id
+                     ORDER BY fecha_hora DESC, id DESC
+                     LIMIT 1
+                     FOR UPDATE'
+                );
+                $consultaDispositivo->bindValue(':dispositivo_id', $dispositivoId, PDO::PARAM_STR);
+                $consultaDispositivo->execute();
+                $ultimoMovimientoDispositivo = $consultaDispositivo->fetch();
+
+                if (
+                    $ultimoMovimientoDispositivo !== false
+                    && $ultimoMovimientoDispositivo['movimiento'] === 'ENTRADA'
+                    && (int) $ultimoMovimientoDispositivo['usuario_id'] !== $usuarioId
+                ) {
+                    throw new InvalidArgumentException(
+                        'Este dispositivo ya tiene una entrada abierta con otro usuario. Debe registrarse primero la salida.'
+                    );
+                }
+            }
+
             $consulta = $this->pdo->prepare(
                 'INSERT INTO movimientos
-                         (usuario_id, movimiento, obra, latitud, longitud, fotografia)
+                         (usuario_id, movimiento, obra, latitud, longitud, fotografia, ip_address, dispositivo_id)
                  VALUES
-                         (:usuario_id, :movimiento, :obra, :latitud, :longitud, :fotografia)'
+                         (:usuario_id, :movimiento, :obra, :latitud, :longitud, :fotografia, :ip_address, :dispositivo_id)'
             );
 
             $consulta->bindValue(':usuario_id', $usuarioId, PDO::PARAM_INT);
@@ -114,6 +140,8 @@ class MovimientosController
             $consulta->bindValue(':latitud', $latitud, PDO::PARAM_STR);
             $consulta->bindValue(':longitud', $longitud, PDO::PARAM_STR);
             $consulta->bindValue(':fotografia', $fotografia, PDO::PARAM_LOB);
+            $consulta->bindValue(':ip_address', $ipAddress, $ipAddress === null ? PDO::PARAM_NULL : PDO::PARAM_STR);
+            $consulta->bindValue(':dispositivo_id', $dispositivoId, $dispositivoId === null ? PDO::PARAM_NULL : PDO::PARAM_STR);
             $consulta->execute();
 
             $movimientoId = (int) $this->pdo->lastInsertId();
@@ -303,7 +331,9 @@ if (in_array($_SERVER['REQUEST_METHOD'], ['POST', 'GET', 'PUT', 'DELETE'], true)
                 trim((string) ($_POST['obra'] ?? '')),
                 trim((string) ($_POST['latitud'] ?? '')),
                 trim((string) ($_POST['longitud'] ?? '')),
-                $fotografia
+                $fotografia,
+                $autenticacion->obtenerIpCliente(),
+                $autenticacion->obtenerDispositivoId()
             );
             http_response_code(201);
             $respuesta = ['exito' => true, 'mensaje' => 'Movimiento registrado correctamente.', 'movimiento_id' => $movimientoId];

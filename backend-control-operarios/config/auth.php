@@ -14,6 +14,30 @@ class Autenticacion
             ]);
             session_start();
         }
+
+        if (!$this->obtenerDispositivoId()) {
+            $dispositivoId = bin2hex(random_bytes(16));
+            setcookie('dispositivo_id', $dispositivoId, [
+                'expires' => time() + (60 * 60 * 24 * 365 * 2),
+                'path' => '/',
+                'secure' => !empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off',
+                'httponly' => true,
+                'samesite' => 'Lax'
+            ]);
+            $_COOKIE['dispositivo_id'] = $dispositivoId;
+        }
+    }
+
+    public function obtenerDispositivoId(): ?string
+    {
+        $dispositivoId = $_COOKIE['dispositivo_id'] ?? '';
+        return preg_match('/^[a-f0-9]{32}$/', $dispositivoId) === 1 ? $dispositivoId : null;
+    }
+
+    public function obtenerIpCliente(): ?string
+    {
+        $ip = $_SERVER['REMOTE_ADDR'] ?? '';
+        return filter_var($ip, FILTER_VALIDATE_IP) !== false ? $ip : null;
     }
 
     public function iniciarSesion(string $usuario, string $contrasena): array
