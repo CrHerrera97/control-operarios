@@ -91,7 +91,7 @@
 	<section class="tabla-contenedor">
 		<table>
 			<thead>
-				<tr><th>Persona</th><th>Movimiento</th><th>Obra</th><th>Latitud</th><th>Longitud</th><th>Mapa</th><th>Fotografía</th><th>Fecha y hora</th><th>Acción</th></tr>
+				<tr><th>Persona</th><th>Movimiento</th><th>Obra</th><th>Latitud</th><th>Longitud</th><th>IP</th><th>Mapa</th><th>Fotografía</th><th>Fecha y hora</th><th>Acción</th></tr>
 			</thead>
 			<tbody id="registros"></tbody>
 		</table>
@@ -150,6 +150,7 @@
 			<td>${escapar(registro.obra || "")}</td>
 			<td>${Number(registro.latitud).toFixed(6)}</td>
 			<td>${Number(registro.longitud).toFixed(6)}</td>
+			<td>${escapar(registro.ip_address || "No disponible")}</td>
 			<td><a class="mapa-enlace" href="https://www.google.com/maps?q=${Number(registro.latitud)},${Number(registro.longitud)}" target="_blank" rel="noopener noreferrer">Ver mapa</a></td>
 			<td><a class="foto-link" href="#" data-imagen="${fotoSrc}" aria-label="Ver foto de ${escapar(registro.persona)}"><img class="foto" src="${fotoSrc}" alt="Foto de ${escapar(registro.persona)}"></a></td>
 			<td>${new Date(registro.fecha_hora).toLocaleString("es-ES")}</td>

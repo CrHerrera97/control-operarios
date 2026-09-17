@@ -99,6 +99,30 @@ class MovimientosController
                         'La salida debe registrarse para la obra de la entrada abierta: "' . $ultimoMovimiento['obra'] . '".'
                     );
                 }
+
+                if ($movimiento === 'SALIDA' && $dispositivoId !== null) {
+                    $consultaEntrada = $this->pdo->prepare(
+                        'SELECT dispositivo_id
+                         FROM movimientos
+                         WHERE usuario_id = :usuario_id AND movimiento = \'ENTRADA\'
+                         ORDER BY fecha_hora DESC, id DESC
+                         LIMIT 1
+                         FOR UPDATE'
+                    );
+                    $consultaEntrada->bindValue(':usuario_id', $usuarioId, PDO::PARAM_INT);
+                    $consultaEntrada->execute();
+                    $entradaAbierta = $consultaEntrada->fetch();
+
+                    if (
+                        $entradaAbierta !== false
+                        && $entradaAbierta['dispositivo_id'] !== null
+                        && !hash_equals((string) $entradaAbierta['dispositivo_id'], $dispositivoId)
+                    ) {
+                        throw new InvalidArgumentException(
+                            'La salida debe registrarse desde el mismo dispositivo donde se registró la entrada.'
+                        );
+                    }
+                }
             } elseif ($movimiento === 'SALIDA') {
                 throw new InvalidArgumentException('No hay una entrada previa para registrar la salida.');
             }
@@ -162,6 +186,7 @@ class MovimientosController
                 'SELECT m.id, m.usuario_id,
                     u.nombre_completo AS persona,
                     m.movimiento AS tipo, m.obra, m.latitud, m.longitud,
+                    m.ip_address,
                     TO_BASE64(m.fotografia) AS fotografia, m.fecha_hora
              FROM movimientos m
                  INNER JOIN usuarios u ON u.id = m.usuario_id
