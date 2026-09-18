@@ -289,7 +289,7 @@
 			ubicaciones.forEach(function(registro) {
 				const punto = ol.proj.fromLonLat([Number(registro.longitud), Number(registro.latitud)]);
 				const marcador = new ol.Feature({ geometry: new ol.geom.Point(punto) });
-				marcador.set("nombre", registro.persona || "Operario");
+				marcador.set("nombre", `${registro.persona || "Operario"}\nObra: ${registro.obra || "Sin obra"}`);
 				marcador.set("informacion", `<strong>${escapar(registro.persona)}</strong><br>${escapar(registro.tipo)}<br>${escapar(registro.obra || "Sin obra")}<br>${new Date(registro.fecha_hora).toLocaleString("es-ES")}`);
 				fuenteMapa.addFeature(marcador);
 			});
