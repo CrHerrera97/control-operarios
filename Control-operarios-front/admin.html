@@ -4,6 +4,7 @@
 	<meta charset="UTF-8">
 	<meta name="viewport" content="width=device-width, initial-scale=1.0">
 	<title>Registros | Control de operarios</title>
+		<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/ol@10.6.1/ol.css">
 	<style>
 		:root { --azul: #31629a; --amarillo: #f5c223; --blanco: #fff; }
 		* { box-sizing: border-box; }
@@ -45,6 +46,13 @@
 		.exportar { display: flex; gap: 10px; margin-bottom: 18px; }
 		.exportar button { background: #227447; }
 		.exportar .pdf { background: #b83232; }
+		.modal-mapa { position: fixed; inset: 0; background: rgba(15, 23, 42, 0.72); display: none; align-items: center; justify-content: center; padding: 24px; z-index: 1000; }
+		.modal-mapa.visible { display: flex; }
+		.modal-mapa-cuerpo { position: relative; width: min(94vw, 1100px); height: 82vh; max-height: 720px; min-height: 420px; background: #fff; border-radius: 14px; padding: 18px; overflow: hidden; box-shadow: 0 25px 80px rgba(0,0,0,.22); }
+		#mapaOperarios { width: 100%; height: 100%; min-height: 0; border-radius: 10px; }
+		.mapa-popup { position: absolute; bottom: 36px; left: 36px; min-width: 190px; max-width: 280px; padding: 10px 14px; border-radius: 8px; background: #fff; box-shadow: 0 3px 14px rgba(15, 23, 42, .25); color: #1f2f43; font-size: 13px; line-height: 1.45; }
+		.mapa-popup.oculto { display: none; }
+		.cerrar-mapa { position: absolute; top: 28px; right: 28px; z-index: 500; border: 0; border-radius: 999px; background: rgba(184, 50, 50, .95); color: #fff; width: 38px; height: 38px; font-size: 22px; line-height: 1; cursor: pointer; padding: 0; }
 		@media print { body { padding: 0; background: #fff; } header, .filtros, .nota, .resultados, .exportar { display: none; } .tabla-contenedor { box-shadow: none; } table { min-width: 0; font-size: 10px; } .foto { width: 80px; height: 60px; } }
 		@media (max-width: 620px) { body { padding: 18px 12px; } header { align-items: flex-start; flex-direction: column; } h1 { font-size: 25px; } }
 		@media (max-width: 900px) { .filtros { grid-template-columns: repeat(2, 1fr); } .limpiar { align-self: center; } }
@@ -57,6 +65,7 @@
 		<h1>Registro de movimientos</h1>
 		<div class="acciones-header">
 			<a href="usuarios.html">Gestionar usuarios</a>
+			<button type="button" onclick="abrirMapaOperarios()">Ver operarios en mapa</button>
 			<button class="cerrar-sesion" type="button" onclick="window.location.href = 'logout.html'">Cerrar sesión</button>
 		</div>
 	</header>
@@ -103,7 +112,15 @@
 			<img id="modalImagen" src="" alt="Fotografía ampliada">
 		</div>
 	</div>
+	<div id="modalMapa" class="modal-mapa" aria-modal="true" role="dialog" aria-label="Ubicación de los operarios">
+		<div class="modal-mapa-cuerpo">
+			<button class="cerrar-mapa" type="button" aria-label="Cerrar mapa" onclick="cerrarMapa()">×</button>
+			<div id="mapaOperarios"></div>
+			<div id="mapaPopup" class="mapa-popup oculto"></div>
+		</div>
+	</div>
 </main>
+<script src="https://cdn.jsdelivr.net/npm/ol@10.6.1/dist/ol.js"></script>
 <script>
 	const URL_MOVIMIENTOS = 'https://asistencia.rhelectronics.com.co/backend-control-operarios/controllers/movimientos.php';
 	const sesion = JSON.parse(localStorage.getItem('usuarioSesion') || 'null');
@@ -121,6 +138,8 @@
 	const filtroHasta = document.getElementById("filtroHasta");
 	let registros = [];
 	let registrosVisibles = [];
+	let mapaOperarios = null;
+	let fuenteMapa = null;
 
 	function mostrarRegistros() {
 		const personaBuscada = filtroPersona.value.trim().toLocaleLowerCase();
@@ -232,6 +251,99 @@
 		window.print();
 	}
 
+	function obtenerOperariosActivos() {
+		const ultimoMovimientoPorPersona = new Map();
+		registros.forEach(function(registro) {
+			const nombre = String(registro.persona || "").trim();
+			const clave = nombre.toLocaleLowerCase();
+			if (!clave) return;
+			const fecha = new Date(registro.fecha_hora).getTime();
+			const movimientoAnterior = ultimoMovimientoPorPersona.get(clave);
+			if (!movimientoAnterior || fecha >= movimientoAnterior.fecha) {
+				ultimoMovimientoPorPersona.set(clave, { registro: registro, fecha: fecha });
+			}
+		});
+
+		return Array.from(ultimoMovimientoPorPersona.values())
+			.filter(function(movimiento) { return movimiento.registro.tipo === "ENTRADA"; })
+			.map(function(movimiento) { return movimiento.registro; });
+	}
+
+	function abrirMapaOperarios() {
+		const ubicaciones = obtenerOperariosActivos().filter(function(registro) {
+			const latitud = Number(registro.latitud);
+			const longitud = Number(registro.longitud);
+			return Number.isFinite(latitud) && Number.isFinite(longitud) && latitud >= -90 && latitud <= 90 && longitud >= -180 && longitud <= 180;
+		});
+		if (!ubicaciones.length) {
+			alert("No hay registros con una ubicación válida para mostrar.");
+			return;
+		}
+
+		const modal = document.getElementById("modalMapa");
+		modal.classList.add("visible");
+		if (mapaOperarios) mapaOperarios.setTarget(null);
+
+		requestAnimationFrame(function() {
+			fuenteMapa = new ol.source.Vector();
+			ubicaciones.forEach(function(registro) {
+				const punto = ol.proj.fromLonLat([Number(registro.longitud), Number(registro.latitud)]);
+				const marcador = new ol.Feature({ geometry: new ol.geom.Point(punto) });
+				marcador.set("nombre", registro.persona || "Operario");
+				marcador.set("informacion", `<strong>${escapar(registro.persona)}</strong><br>${escapar(registro.tipo)}<br>${escapar(registro.obra || "Sin obra")}<br>${new Date(registro.fecha_hora).toLocaleString("es-ES")}`);
+				fuenteMapa.addFeature(marcador);
+			});
+
+			const popup = document.getElementById("mapaPopup");
+			mapaOperarios = new ol.Map({
+				target: "mapaOperarios",
+				layers: [
+					new ol.layer.Tile({ source: new ol.source.OSM() }),
+					new ol.layer.Vector({
+						source: fuenteMapa,
+						style: function(feature) {
+							return new ol.style.Style({
+								image: new ol.style.Circle({
+									radius: 8,
+									fill: new ol.style.Fill({ color: "#b83232" }),
+									stroke: new ol.style.Stroke({ color: "#fff", width: 2 })
+								}),
+								text: new ol.style.Text({
+									text: String(feature.get("nombre")),
+									offsetY: -19,
+									font: "bold 12px Arial",
+									padding: [2, 4, 2, 4],
+									fill: new ol.style.Fill({ color: "#1f2f43" }),
+									backgroundFill: new ol.style.Fill({ color: "rgba(255, 255, 255, .9)" }),
+									stroke: new ol.style.Stroke({ color: "#fff", width: 3 })
+								})
+							});
+						}
+					})
+				],
+				view: new ol.View({ center: ol.proj.fromLonLat([Number(ubicaciones[0].longitud), Number(ubicaciones[0].latitud)]), zoom: 13 })
+			});
+			mapaOperarios.getView().fit(fuenteMapa.getExtent(), { padding: [50, 50, 50, 50], maxZoom: 16 });
+			mapaOperarios.on("singleclick", function(evento) {
+				const marcador = mapaOperarios.forEachFeatureAtPixel(evento.pixel, function(feature) { return feature; });
+				if (!marcador) {
+					popup.classList.add("oculto");
+					return;
+				}
+				popup.innerHTML = marcador.get("informacion");
+				popup.classList.remove("oculto");
+			});
+			requestAnimationFrame(function() { mapaOperarios.updateSize(); });
+		});
+	}
+
+	function cerrarMapa() {
+		const modal = document.getElementById("modalMapa");
+		if (modal) modal.classList.remove("visible");
+		const popup = document.getElementById("mapaPopup");
+		if (popup) popup.classList.add("oculto");
+	}
+
 	async function cargarRegistros() {
 		try {
 			const respuesta = await fetch(URL_MOVIMIENTOS, {
@@ -278,6 +390,7 @@
 	document.addEventListener("keydown", function(evento) {
 		if (evento.key === "Escape") {
 			cerrarFoto();
+			cerrarMapa();
 		}
 	});
 
