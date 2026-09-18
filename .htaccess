@@ -1,0 +1,4 @@
+DirectoryIndex index.html
+
+RewriteEngine On
+RewriteRule ^$ https://asistencia.rhelectronics.com.co/control-operarios-front/login.html [R=302,L]
