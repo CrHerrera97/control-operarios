@@ -100,7 +100,7 @@
 	<section class="tabla-contenedor">
 		<table>
 			<thead>
-				<tr><th>Persona</th><th>Movimiento</th><th>Obra</th><th>Latitud</th><th>Longitud</th><th>IP</th><th>Mapa</th><th>Fotografía</th><th>Fecha y hora</th><th>Acción</th></tr>
+				<tr><th>Persona</th><th>Movimiento</th><th>Obra</th><th>Notas</th><th>Latitud</th><th>Longitud</th><th>IP</th><th>Mapa</th><th>Fotografía</th><th>Fecha y hora</th><th>Acción</th></tr>
 			</thead>
 			<tbody id="registros"></tbody>
 		</table>
@@ -167,6 +167,7 @@
 			<td>${escapar(registro.persona)}</td>
 			<td class="movimiento ${claseMovimiento}">${escapar(registro.tipo)}</td>
 			<td>${escapar(registro.obra || "")}</td>
+			<td>${escapar(registro.notas || "")}</td>
 			<td>${Number(registro.latitud).toFixed(6)}</td>
 			<td>${Number(registro.longitud).toFixed(6)}</td>
 			<td>${escapar(registro.ip_address || "No disponible")}</td>
@@ -222,12 +223,13 @@
 				registro.persona,
 				registro.tipo,
 				registro.obra || "",
+				registro.notas || "",
 				registro.latitud,
 				registro.longitud,
 				new Date(registro.fecha_hora).toLocaleString("es-ES")
 			];
 		});
-		const contenido = [["Persona", "Movimiento", "Obra", "Latitud", "Longitud", "Fecha y hora"]]
+		const contenido = [["Persona", "Movimiento", "Obra", "Notas", "Latitud", "Longitud", "Fecha y hora"]]
 			.concat(filas)
 			.map(function(fila) { return fila.map(celda).join(";"); })
 			.join("\r\n");

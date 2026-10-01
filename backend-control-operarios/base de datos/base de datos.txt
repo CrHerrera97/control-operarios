@@ -37,3 +37,34 @@ CREATE TABLE movimientos (
     INDEX idx_movimientos_usuario (usuario_id),
     INDEX idx_movimientos_dispositivo (dispositivo_id)
 ) ENGINE=InnoDB;
+
+ALTER TABLE movimientos
+    ADD COLUMN notas VARCHAR(255) NULL;
+
+-- Requiere que el servidor MySQL tenga event_scheduler=ON.
+SET @zona_horaria_anterior = @@session.time_zone;
+SET time_zone = '-05:00';
+
+CREATE EVENT IF NOT EXISTS cierre_diario_movimientos
+ON SCHEDULE EVERY 1 DAY
+STARTS (TIMESTAMP(DATE_ADD(CURDATE(), INTERVAL IF(CURTIME() < '23:30:00', 0, 1) DAY), '23:30:00'))
+ON COMPLETION PRESERVE
+ENABLE
+DO
+        INSERT INTO movimientos
+                (usuario_id, movimiento, obra, latitud, longitud, fotografia, ip_address, dispositivo_id, fecha_hora, notas)
+        SELECT entrada.usuario_id, 'SALIDA', entrada.obra, entrada.latitud, entrada.longitud,
+                     entrada.fotografia, entrada.ip_address, entrada.dispositivo_id, CURRENT_TIMESTAMP,
+                     'NO REALIZÓ SALIDA'
+        FROM movimientos AS entrada
+        WHERE entrada.movimiento = 'ENTRADA'
+            AND DATE(entrada.fecha_hora) = CURRENT_DATE()
+            AND NOT EXISTS (
+                    SELECT 1
+                    FROM movimientos AS posterior
+                    WHERE posterior.usuario_id = entrada.usuario_id
+                        AND (posterior.fecha_hora > entrada.fecha_hora
+                                 OR (posterior.fecha_hora = entrada.fecha_hora AND posterior.id > entrada.id))
+            );
+
+SET time_zone = @zona_horaria_anterior;

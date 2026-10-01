@@ -186,7 +186,7 @@ class MovimientosController
                 'SELECT m.id, m.usuario_id,
                     u.nombre_completo AS persona,
                     m.movimiento AS tipo, m.obra, m.latitud, m.longitud,
-                    m.ip_address,
+                    m.ip_address, m.notas,
                     TO_BASE64(m.fotografia) AS fotografia, m.fecha_hora
              FROM movimientos m
                  INNER JOIN usuarios u ON u.id = m.usuario_id
@@ -204,7 +204,7 @@ class MovimientosController
         }
 
         $consulta = $this->pdo->prepare(
-            'SELECT id, usuario_id, movimiento, obra, latitud, longitud,
+            'SELECT id, usuario_id, movimiento, obra, notas, latitud, longitud,
                     TO_BASE64(fotografia) AS fotografia, fecha_hora
              FROM movimientos
              WHERE usuario_id = :usuario_id
@@ -225,7 +225,7 @@ class MovimientosController
         }
 
         $consulta = $this->pdo->prepare(
-            'SELECT id, usuario_id, movimiento, obra, latitud, longitud,
+            'SELECT id, usuario_id, movimiento, obra, notas, latitud, longitud,
                     TO_BASE64(fotografia) AS fotografia, fecha_hora
              FROM movimientos
              WHERE id = :id'
@@ -282,6 +282,15 @@ class MovimientosController
             $valores[':obra'] = $obra;
         }
 
+        if (array_key_exists('notas', $datos)) {
+            $notas = trim((string) $datos['notas']);
+            if (strlen($notas) > 255) {
+                throw new InvalidArgumentException('Las notas no pueden superar 255 caracteres.');
+            }
+            $campos[] = 'notas = :notas';
+            $valores[':notas'] = $notas === '' ? null : $notas;
+        }
+
         foreach (['latitud' => [-90, 90], 'longitud' => [-180, 180]] as $campo => $limites) {
             if (array_key_exists($campo, $datos)) {
                 $valor = (string) $datos[$campo];
@@ -310,7 +319,9 @@ class MovimientosController
             'UPDATE movimientos SET ' . implode(', ', $campos) . ' WHERE id = :id'
         );
         foreach ($valores as $parametro => $valor) {
-            $tipo = is_int($valor) ? PDO::PARAM_INT : ($parametro === ':fotografia' ? PDO::PARAM_LOB : PDO::PARAM_STR);
+            $tipo = $valor === null
+                ? PDO::PARAM_NULL
+                : (is_int($valor) ? PDO::PARAM_INT : ($parametro === ':fotografia' ? PDO::PARAM_LOB : PDO::PARAM_STR));
             $consulta->bindValue($parametro, $valor, $tipo);
         }
         $consulta->execute();
