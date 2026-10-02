@@ -19,6 +19,7 @@
                 });
             } finally {
                 localStorage.removeItem('usuarioSesion');
+                localStorage.removeItem('sesionIniciadaEn');
                 window.location.replace('login.html');
             }
         }

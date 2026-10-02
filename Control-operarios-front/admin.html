@@ -121,9 +121,10 @@
 	</div>
 </main>
 <script src="https://cdn.jsdelivr.net/npm/ol@10.6.1/dist/ol.js"></script>
+<script src="auth-session.js"></script>
 <script>
 	const URL_MOVIMIENTOS = 'https://asistencia.rhelectronics.com.co/backend-control-operarios/controllers/movimientos.php';
-	const sesion = JSON.parse(localStorage.getItem('usuarioSesion') || 'null');
+	const sesion = obtenerSesionActiva('ADMIN');
 	if (!sesion || sesion.rol !== 'ADMIN') {
 		window.location.replace('login.html');
 	}

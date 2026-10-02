@@ -105,9 +105,10 @@
     </div>
 </dialog>
 
+<script src="auth-session.js"></script>
 <script>
     const URL_USUARIOS = 'https://asistencia.rhelectronics.com.co/backend-control-operarios/controllers/usuarios.php';
-    const sesion = JSON.parse(localStorage.getItem('usuarioSesion') || 'null');
+    const sesion = obtenerSesionActiva('ADMIN');
     const listaUsuarios = document.getElementById('listaUsuarios');
     const usuariosVacios = document.getElementById('usuariosVacios');
     const contadorUsuarios = document.getElementById('contadorUsuarios');

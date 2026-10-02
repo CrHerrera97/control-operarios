@@ -218,6 +218,7 @@
 </div>
 
 
+<script src="auth-session.js"></script>
 <script>
 
     const URL_MOVIMIENTOS = 'https://asistencia.rhelectronics.com.co/backend-control-operarios/controllers/movimientos.php';
@@ -226,7 +227,7 @@
     let precision = null;
     let fotoSeleccionada = null;
     let fotoBase64 = null;
-    const usuarioSesion = JSON.parse(localStorage.getItem("usuarioSesion") || "null");
+    const usuarioSesion = obtenerSesionActiva("OPERARIO");
 
     if (window.location.protocol === "file:") {
         window.location.replace("login.html");

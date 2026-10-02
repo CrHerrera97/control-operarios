@@ -4,10 +4,14 @@ declare(strict_types=1);
 
 class Autenticacion
 {
+    private const DURACION_SESION = 7200;
+
     public function __construct(private PDO $pdo)
     {
         if (session_status() !== PHP_SESSION_ACTIVE) {
+            ini_set('session.gc_maxlifetime', (string) self::DURACION_SESION);
             session_set_cookie_params([
+                'lifetime' => self::DURACION_SESION,
                 'httponly' => true,
                 'secure' => !empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off',
                 'samesite' => 'Lax'
@@ -65,6 +69,7 @@ class Autenticacion
             'nombre_completo' => $usuarioEncontrado['nombre_completo'],
             'rol' => $usuarioEncontrado['rol']
         ];
+        $_SESSION['iniciada_en'] = time();
 
         return $_SESSION['usuario'];
     }
@@ -74,6 +79,16 @@ class Autenticacion
         if (!isset($_SESSION['usuario']) || !is_array($_SESSION['usuario'])) {
             http_response_code(401);
             throw new RuntimeException('Debes iniciar sesión para acceder a este endpoint.');
+        }
+
+        if (
+            !isset($_SESSION['iniciada_en'])
+            || time() - (int) $_SESSION['iniciada_en'] >= self::DURACION_SESION
+        ) {
+            $_SESSION = [];
+            session_destroy();
+            http_response_code(401);
+            throw new RuntimeException('La sesión expiró. Debes iniciar sesión nuevamente.');
         }
 
         return $_SESSION['usuario'];

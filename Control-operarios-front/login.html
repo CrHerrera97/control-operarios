@@ -103,7 +103,7 @@
 </head>
 <body>
     <main class="login">
-        <h1>Iniciar sesión</h1>
+        <h1>Iniciar sesion</h1>
         <form id="formularioLogin">
             <label class="campo" for="usuario">
                 Usuario
@@ -111,7 +111,7 @@
             </label>
 
             <label class="campo" for="contrasena">
-                Contraseña
+                Contrasena
                 <input type="password" id="contrasena" name="contrasena" autocomplete="current-password" required>
             </label>
 
@@ -147,6 +147,7 @@
                 }
 
                 localStorage.setItem('usuarioSesion', JSON.stringify(resultado.usuario));
+                localStorage.setItem('sesionIniciadaEn', String(Date.now()));
                 window.location.href = resultado.usuario.rol === 'ADMIN' ? 'admin.html' : 'control.html';
             } catch (error) {
                 mensajeLogin.textContent = error.message || 'No se pudo conectar con el servidor.';
