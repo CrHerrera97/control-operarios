@@ -158,53 +158,62 @@
 	const paginaSiguiente = document.getElementById("paginaSiguiente");
 	const paginaActual = document.getElementById("paginaActual");
 	const tamanoPagina = document.getElementById("tamanoPagina");
-	let registros = [];
 	let registrosVisibles = [];
 	let numeroPagina = 1;
-	let imprimirTodosLosRegistros = false;
+	let totalRegistros = 0;
+	let totalPaginas = 1;
+	let solicitudActual = 0;
 	let mapaOperarios = null;
 	let fuenteMapa = null;
 
-	function mostrarRegistros() {
-		const personaBuscada = filtroPersona.value.trim().toLocaleLowerCase();
-		const tipoBuscado = filtroTipo.value;
-		const obraBuscada = filtroObra.value.trim().toLocaleLowerCase();
-		const fechaDesde = filtroDesde.value ? new Date(filtroDesde.value + "T00:00:00") : null;
-		const fechaHasta = filtroHasta.value ? new Date(filtroHasta.value + "T23:59:59.999") : null;
-		const registrosFiltrados = registros.filter(function(registro) {
-			const fechaRegistro = new Date(registro.fecha_hora);
-			const coincidePersona = !personaBuscada || registro.persona.toLocaleLowerCase().includes(personaBuscada);
-			const coincideTipo = !tipoBuscado || registro.tipo === tipoBuscado;
-			const coincideObra = !obraBuscada || (registro.obra || "").toLocaleLowerCase().includes(obraBuscada);
-			const coincideDesde = !fechaDesde || fechaRegistro >= fechaDesde;
-			const coincideHasta = !fechaHasta || fechaRegistro <= fechaHasta;
-			return coincidePersona && coincideTipo && coincideObra && coincideDesde && coincideHasta;
+	function obtenerParametrosConsulta(opciones) {
+		const parametros = new URLSearchParams({
+			pagina: String(numeroPagina),
+			limite: tamanoPagina.value,
+			persona: filtroPersona.value.trim(),
+			tipo: filtroTipo.value,
+			obra: filtroObra.value.trim(),
+			desde: filtroDesde.value,
+			hasta: filtroHasta.value
 		});
-		registrosVisibles = registrosFiltrados;
-		const cantidadPorPagina = imprimirTodosLosRegistros ? registrosFiltrados.length || 1 : Number(tamanoPagina.value);
-		const totalPaginas = Math.ceil(registrosFiltrados.length / cantidadPorPagina) || 1;
-		numeroPagina = Math.min(numeroPagina, totalPaginas);
-		const inicio = (numeroPagina - 1) * cantidadPorPagina;
-		const registrosPagina = registrosFiltrados.slice(inicio, inicio + cantidadPorPagina);
+		if (opciones && opciones.todos) parametros.set("todos", "1");
+		if (opciones && opciones.fotografia === false) parametros.set("fotografia", "0");
+		return parametros;
+	}
 
+	async function consultarMovimientos(opciones) {
+		const parametros = obtenerParametrosConsulta(opciones);
+		const respuesta = await fetch(`${URL_MOVIMIENTOS}?${parametros}`, {
+			method: "GET",
+			credentials: "include",
+			cache: "no-store"
+		});
+		const resultado = await respuesta.json();
+		if (!respuesta.ok || !resultado.exito) {
+			throw new Error(resultado.mensaje || "No se pudieron cargar los movimientos.");
+		}
+		return resultado;
+	}
+
+	function renderizarFilas(registrosPagina) {
 		cuerpo.innerHTML = "";
 		registrosPagina.forEach(function(registro) {
-		const fila = document.createElement("tr");
-		const claseMovimiento = registro.tipo === "ENTRADA" ? "entrada" : "salida";
-		const fotoSrc = `data:image/jpeg;base64,${registro.fotografia}`;
-		fila.innerHTML = `
-			<td>${escapar(registro.persona)}</td>
-			<td class="movimiento ${claseMovimiento}">${escapar(registro.tipo)}</td>
-			<td>${escapar(registro.obra || "")}</td>
-			<td>${escapar(registro.notas || "")}</td>
-			<td>${Number(registro.latitud).toFixed(6)}</td>
-			<td>${Number(registro.longitud).toFixed(6)}</td>
-			<td>${escapar(registro.ip_address || "No disponible")}</td>
-			<td><a class="mapa-enlace" href="https://www.google.com/maps?q=${Number(registro.latitud)},${Number(registro.longitud)}" target="_blank" rel="noopener noreferrer">Ver mapa</a></td>
-			<td><a class="foto-link" href="#" data-imagen="${fotoSrc}" aria-label="Ver foto de ${escapar(registro.persona)}"><img class="foto" src="${fotoSrc}" alt="Foto de ${escapar(registro.persona)}"></a></td>
-			<td>${new Date(registro.fecha_hora).toLocaleString("es-ES")}</td>
-			<td><button class="eliminar-registro" type="button" data-id="${Number(registro.id)}" data-persona="${escapar(registro.persona)}">Eliminar</button></td>`;
-		cuerpo.appendChild(fila);
+			const fila = document.createElement("tr");
+			const claseMovimiento = registro.tipo === "ENTRADA" ? "entrada" : "salida";
+			const fotoSrc = `data:image/jpeg;base64,${registro.fotografia}`;
+			fila.innerHTML = `
+				<td>${escapar(registro.persona)}</td>
+				<td class="movimiento ${claseMovimiento}">${escapar(registro.tipo)}</td>
+				<td>${escapar(registro.obra || "")}</td>
+				<td>${escapar(registro.notas || "")}</td>
+				<td>${Number(registro.latitud).toFixed(6)}</td>
+				<td>${Number(registro.longitud).toFixed(6)}</td>
+				<td>${escapar(registro.ip_address || "No disponible")}</td>
+				<td><a class="mapa-enlace" href="https://www.google.com/maps?q=${Number(registro.latitud)},${Number(registro.longitud)}" target="_blank" rel="noopener noreferrer">Ver mapa</a></td>
+				<td><a class="foto-link" href="#" data-imagen="${fotoSrc}" aria-label="Ver foto de ${escapar(registro.persona)}"><img class="foto" src="${fotoSrc}" alt="Foto de ${escapar(registro.persona)}"></a></td>
+				<td>${new Date(registro.fecha_hora).toLocaleString("es-ES")}</td>
+				<td><button class="eliminar-registro" type="button" data-id="${Number(registro.id)}" data-persona="${escapar(registro.persona)}">Eliminar</button></td>`;
+			cuerpo.appendChild(fila);
 		});
 
 		const enlacesFoto = document.querySelectorAll(".foto-link");
@@ -221,18 +230,51 @@
 				eliminarRegistro(Number(this.dataset.id), this.dataset.persona);
 			});
 		});
-
-		vacio.textContent = registros.length ? "No hay registros que coincidan con los filtros." : "Todavía no hay movimientos registrados.";
-		vacio.style.display = registrosFiltrados.length ? "none" : "block";
-		const fin = Math.min(inicio + registrosPagina.length, registrosFiltrados.length);
-		contadorRegistros.textContent = `Mostrando ${registrosFiltrados.length ? inicio + 1 : 0}-${fin} de ${registrosFiltrados.length} registros (${registros.length} en total)`;
-		paginaActual.textContent = `Página ${numeroPagina} de ${totalPaginas}`;
-		paginaAnterior.disabled = numeroPagina === 1;
-		paginaSiguiente.disabled = numeroPagina === totalPaginas;
 	}
 
-	[filtroPersona, filtroTipo, filtroObra, filtroDesde, filtroHasta].forEach(function(filtro) {
-		filtro.addEventListener("input", function() { numeroPagina = 1; mostrarRegistros(); });
+	async function mostrarRegistros() {
+		const solicitud = ++solicitudActual;
+		paginaAnterior.disabled = true;
+		paginaSiguiente.disabled = true;
+		estadoFecha.textContent = "Cargando registros...";
+		try {
+			const resultado = await consultarMovimientos();
+			if (solicitud !== solicitudActual) return;
+			registrosVisibles = resultado.movimientos || [];
+			totalRegistros = Number(resultado.total) || 0;
+			totalPaginas = Number(resultado.totalPaginas) || 1;
+			numeroPagina = Number(resultado.pagina) || 1;
+			renderizarFilas(registrosVisibles);
+			vacio.textContent = totalRegistros ? "No hay registros que coincidan con los filtros." : "Todavía no hay movimientos registrados.";
+			vacio.style.display = totalRegistros ? "none" : "block";
+			const inicio = totalRegistros ? (numeroPagina - 1) * Number(tamanoPagina.value) + 1 : 0;
+			const fin = Math.min((numeroPagina - 1) * Number(tamanoPagina.value) + registrosVisibles.length, totalRegistros);
+			contadorRegistros.textContent = `Mostrando ${inicio}-${fin} de ${totalRegistros} registros`;
+			estadoFecha.textContent = "Registros cargados desde la base de datos.";
+		} catch (error) {
+			if (solicitud !== solicitudActual) return;
+			registrosVisibles = [];
+			totalRegistros = 0;
+			renderizarFilas(registrosVisibles);
+			vacio.textContent = error.message || "No se pudieron cargar los movimientos.";
+			vacio.style.display = "block";
+			contadorRegistros.textContent = "";
+			estadoFecha.textContent = "No se pudieron cargar los registros.";
+		}
+		paginaActual.textContent = `Página ${numeroPagina} de ${totalPaginas}`;
+		paginaAnterior.disabled = numeroPagina <= 1;
+		paginaSiguiente.disabled = numeroPagina >= totalPaginas;
+	}
+
+	let temporizadorFiltro;
+	[filtroPersona, filtroObra].forEach(function(filtro) {
+		filtro.addEventListener("input", function() {
+			numeroPagina = 1;
+			clearTimeout(temporizadorFiltro);
+			temporizadorFiltro = setTimeout(mostrarRegistros, 300);
+		});
+	});
+	[filtroTipo, filtroDesde, filtroHasta].forEach(function(filtro) {
 		filtro.addEventListener("change", function() { numeroPagina = 1; mostrarRegistros(); });
 	});
 
@@ -259,13 +301,15 @@
 		mostrarRegistros();
 	}
 
-	function exportarExcel() {
-		if (!registrosVisibles.length) {
-			alert("No hay registros para exportar.");
-			return;
-		}
+	async function exportarExcel() {
+		try {
+			const resultado = await consultarMovimientos({ todos: true, fotografia: false });
+			if (!resultado.movimientos.length) {
+				alert("No hay registros para exportar.");
+				return;
+			}
 
-		const filas = registrosVisibles.map(function(registro) {
+		const filas = resultado.movimientos.map(function(registro) {
 			return [
 				registro.persona,
 				registro.tipo,
@@ -286,47 +330,52 @@
 		enlace.download = "registros-movimientos.csv";
 		enlace.click();
 		URL.revokeObjectURL(enlace.href);
+		} catch (error) {
+			alert(error.message || "No se pudieron exportar los registros.");
+		}
 	}
 
 	function celda(valor) {
 		return `"${String(valor == null ? "" : valor).replace(/"/g, '""')}"`;
 	}
 
-	function exportarPdf() {
-		if (!registrosVisibles.length) {
+	async function exportarPdf() {
+		if (!totalRegistros) {
 			alert("No hay registros para exportar.");
 			return;
 		}
-		imprimirTodosLosRegistros = true;
-		numeroPagina = 1;
-		mostrarRegistros();
-		window.addEventListener("afterprint", function restaurarPaginacion() {
-			imprimirTodosLosRegistros = false;
-			mostrarRegistros();
-		}, { once: true });
-		window.print();
+		try {
+			const resultado = await consultarMovimientos({ todos: true });
+			renderizarFilas(resultado.movimientos);
+			window.addEventListener("afterprint", mostrarRegistros, { once: true });
+			window.print();
+		} catch (error) {
+			alert(error.message || "No se pudieron preparar los registros para imprimir.");
+		}
 	}
 
-	function obtenerOperariosActivos() {
-		const ultimoMovimientoPorPersona = new Map();
-		registros.forEach(function(registro) {
-			const nombre = String(registro.persona || "").trim();
-			const clave = nombre.toLocaleLowerCase();
-			if (!clave) return;
-			const fecha = new Date(registro.fecha_hora).getTime();
-			const movimientoAnterior = ultimoMovimientoPorPersona.get(clave);
-			if (!movimientoAnterior || fecha >= movimientoAnterior.fecha) {
-				ultimoMovimientoPorPersona.set(clave, { registro: registro, fecha: fecha });
-			}
+	async function obtenerOperariosActivos() {
+		const respuesta = await fetch(`${URL_MOVIMIENTOS}?activos=1`, {
+			method: "GET",
+			credentials: "include",
+			cache: "no-store"
 		});
-
-		return Array.from(ultimoMovimientoPorPersona.values())
-			.filter(function(movimiento) { return movimiento.registro.tipo === "ENTRADA"; })
-			.map(function(movimiento) { return movimiento.registro; });
+		const resultado = await respuesta.json();
+		if (!respuesta.ok || !resultado.exito) {
+			throw new Error(resultado.mensaje || "No se pudieron cargar los operarios activos.");
+		}
+		return resultado.operarios || [];
 	}
 
-	function abrirMapaOperarios() {
-		const ubicaciones = obtenerOperariosActivos().filter(function(registro) {
+	async function abrirMapaOperarios() {
+		let operariosActivos;
+		try {
+			operariosActivos = await obtenerOperariosActivos();
+		} catch (error) {
+			alert(error.message || "No se pudieron cargar los operarios activos.");
+			return;
+		}
+		const ubicaciones = operariosActivos.filter(function(registro) {
 			const latitud = Number(registro.latitud);
 			const longitud = Number(registro.longitud);
 			return Number.isFinite(latitud) && Number.isFinite(longitud) && latitud >= -90 && latitud <= 90 && longitud >= -180 && longitud <= 180;
@@ -400,25 +449,8 @@
 		if (popup) popup.classList.add("oculto");
 	}
 
-	async function cargarRegistros() {
-		try {
-			const respuesta = await fetch(URL_MOVIMIENTOS, {
-				method: "GET",
-				credentials: "include",
-				cache: "no-store"
-			});
-			const resultado = await respuesta.json();
-			if (!respuesta.ok || !resultado.exito) {
-				throw new Error(resultado.mensaje || "No se pudieron cargar los movimientos.");
-			}
-			registros = resultado.movimientos || [];
-			estadoFecha.textContent = "Registros cargados desde la base de datos.";
-			mostrarRegistros();
-		} catch (error) {
-			estadoFecha.textContent = error.message || "No se pudo conectar con la base de datos.";
-			registros = [];
-			mostrarRegistros();
-		}
+	function cargarRegistros() {
+		mostrarRegistros();
 	}
 
 	cargarRegistros();
@@ -468,9 +500,6 @@
 			if (!respuesta.ok || !resultado.exito) {
 				throw new Error(resultado.mensaje || "No se pudo eliminar el registro.");
 			}
-			registros = registros.filter(function(registro) {
-				return Number(registro.id) !== registroId;
-			});
 			mostrarRegistros();
 		} catch (error) {
 			alert(error.message || "No se pudo eliminar el registro.");

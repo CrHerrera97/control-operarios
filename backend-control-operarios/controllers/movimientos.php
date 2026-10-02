@@ -180,16 +180,107 @@ class MovimientosController
         }
     }
 
-    public function listarMovimientos(): array
-    {
-        $consulta = $this->pdo->prepare(
-                'SELECT m.id, m.usuario_id,
+    public function listarMovimientos(
+        array $filtros,
+        int $pagina,
+        int $limite,
+        bool $todos = false,
+        bool $incluirFotografia = true
+    ): array {
+        $condiciones = [];
+        $parametros = [];
+
+        $persona = trim((string) ($filtros['persona'] ?? ''));
+        if ($persona !== '') {
+            $condiciones[] = 'u.nombre_completo LIKE :persona';
+            $parametros[':persona'] = '%' . $persona . '%';
+        }
+
+        $tipo = strtoupper(trim((string) ($filtros['tipo'] ?? '')));
+        if ($tipo !== '') {
+            if (!in_array($tipo, ['ENTRADA', 'SALIDA'], true)) {
+                throw new InvalidArgumentException('El tipo de movimiento no es válido.');
+            }
+            $condiciones[] = 'm.movimiento = :tipo';
+            $parametros[':tipo'] = $tipo;
+        }
+
+        $obra = trim((string) ($filtros['obra'] ?? ''));
+        if ($obra !== '') {
+            $condiciones[] = 'm.obra LIKE :obra';
+            $parametros[':obra'] = '%' . $obra . '%';
+        }
+
+        foreach (['desde', 'hasta'] as $campoFecha) {
+            $fecha = trim((string) ($filtros[$campoFecha] ?? ''));
+            if ($fecha === '') {
+                continue;
+            }
+            if (preg_match('/^(\d{4})-(\d{2})-(\d{2})$/', $fecha, $partes) !== 1
+                || !checkdate((int) $partes[2], (int) $partes[3], (int) $partes[1])) {
+                throw new InvalidArgumentException('El rango de fechas no es válido.');
+            }
+
+            if ($campoFecha === 'desde') {
+                $condiciones[] = 'm.fecha_hora >= :desde';
+                $parametros[':desde'] = $fecha . ' 00:00:00';
+            } else {
+                $condiciones[] = 'm.fecha_hora < :hasta';
+                $parametros[':hasta'] = (new DateTimeImmutable($fecha))->modify('+1 day')->format('Y-m-d') . ' 00:00:00';
+            }
+        }
+
+        $where = $condiciones ? ' WHERE ' . implode(' AND ', $condiciones) : '';
+        $consultaTotal = $this->pdo->prepare(
+            'SELECT COUNT(*)
+             FROM movimientos m
+             INNER JOIN usuarios u ON u.id = m.usuario_id' . $where
+        );
+        $consultaTotal->execute($parametros);
+        $total = (int) $consultaTotal->fetchColumn();
+        $totalPaginas = (int) ceil($total / $limite);
+        $pagina = $todos ? 1 : min(max(1, $pagina), max(1, $totalPaginas));
+        $fotografia = $incluirFotografia ? 'TO_BASE64(m.fotografia)' : "''";
+        $sql = 'SELECT m.id, m.usuario_id,
                     u.nombre_completo AS persona,
                     m.movimiento AS tipo, m.obra, m.latitud, m.longitud,
                     m.ip_address, m.notas,
-                    TO_BASE64(m.fotografia) AS fotografia, m.fecha_hora
+                    ' . $fotografia . ' AS fotografia, m.fecha_hora
+                FROM movimientos m
+                INNER JOIN usuarios u ON u.id = m.usuario_id' . $where . '
+                ORDER BY m.fecha_hora DESC, m.id DESC';
+        if (!$todos) {
+            $offset = ($pagina - 1) * $limite;
+            $sql .= ' LIMIT ' . $limite . ' OFFSET ' . $offset;
+        }
+
+        $consulta = $this->pdo->prepare($sql);
+        $consulta->execute($parametros);
+
+        return [
+            'movimientos' => $consulta->fetchAll(),
+            'pagina' => $pagina,
+            'limite' => $limite,
+            'total' => $total,
+            'totalPaginas' => $totalPaginas
+        ];
+    }
+
+    public function listarOperariosActivos(): array
+    {
+        $consulta = $this->pdo->prepare(
+            'SELECT m.id, u.nombre_completo AS persona,
+                    m.movimiento AS tipo, m.obra, m.latitud, m.longitud, m.fecha_hora
              FROM movimientos m
-                 INNER JOIN usuarios u ON u.id = m.usuario_id
+             INNER JOIN usuarios u ON u.id = m.usuario_id
+             WHERE NOT EXISTS (
+                 SELECT 1
+                 FROM movimientos posterior
+                 WHERE posterior.usuario_id = m.usuario_id
+                   AND (posterior.fecha_hora > m.fecha_hora
+                     OR (posterior.fecha_hora = m.fecha_hora AND posterior.id > m.id))
+             )
+               AND m.movimiento = \'ENTRADA\'
              ORDER BY m.fecha_hora DESC, m.id DESC'
         );
         $consulta->execute();
@@ -377,10 +468,24 @@ if (in_array($_SERVER['REQUEST_METHOD'], ['POST', 'GET', 'PUT', 'DELETE'], true)
             $usuarioSesion = $autenticacion->exigirSesion();
             if ($movimientoId <= 0) {
                 if (($usuarioSesion['rol'] ?? '') === 'ADMIN') {
-                    $respuesta = [
-                        'exito' => true,
-                        'movimientos' => $controlador->listarMovimientos()
-                    ];
+                    if (($_GET['activos'] ?? '') === '1') {
+                        $respuesta = [
+                            'exito' => true,
+                            'operarios' => $controlador->listarOperariosActivos()
+                        ];
+                    } else {
+                        $limite = (int) ($_GET['limite'] ?? 10);
+                        if (!in_array($limite, [10, 30, 50], true)) {
+                            $limite = 10;
+                        }
+                        $respuesta = ['exito' => true] + $controlador->listarMovimientos(
+                            $_GET,
+                            (int) ($_GET['pagina'] ?? 1),
+                            $limite,
+                            ($_GET['todos'] ?? '') === '1',
+                            ($_GET['fotografia'] ?? '1') !== '0'
+                        );
+                    }
                     echo json_encode($respuesta, JSON_UNESCAPED_UNICODE);
                     exit;
                 }
