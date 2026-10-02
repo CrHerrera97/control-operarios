@@ -43,6 +43,11 @@
 		.filtros input:focus, .filtros select:focus { border-color: var(--azul); outline: none; }
 		.limpiar { align-self: end; background: #657386; white-space: nowrap; }
 		.resultados { margin: 0 0 12px; color: #657386; font-size: 14px; }
+		.paginacion { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 12px; margin: 0 0 16px; color: #657386; font-size: 14px; }
+		.paginacion label { display: flex; align-items: center; gap: 8px; }
+		.paginacion select { min-height: 38px; padding: 6px 10px; border: 2px solid #d7e0eb; border-radius: 7px; color: #1f2f43; font: inherit; }
+		.paginacion button { padding: 9px 12px; background: var(--azul); }
+		.paginacion button:disabled { background: #aab4c0; cursor: not-allowed; }
 		.exportar { display: flex; gap: 10px; margin-bottom: 18px; }
 		.exportar button { background: #227447; }
 		.exportar .pdf { background: #b83232; }
@@ -53,7 +58,7 @@
 		.mapa-popup { position: absolute; bottom: 36px; left: 36px; min-width: 190px; max-width: 280px; padding: 10px 14px; border-radius: 8px; background: #fff; box-shadow: 0 3px 14px rgba(15, 23, 42, .25); color: #1f2f43; font-size: 13px; line-height: 1.45; }
 		.mapa-popup.oculto { display: none; }
 		.cerrar-mapa { position: absolute; top: 28px; right: 28px; z-index: 500; border: 0; border-radius: 999px; background: rgba(184, 50, 50, .95); color: #fff; width: 38px; height: 38px; font-size: 22px; line-height: 1; cursor: pointer; padding: 0; }
-		@media print { body { padding: 0; background: #fff; } header, .filtros, .nota, .resultados, .exportar { display: none; } .tabla-contenedor { box-shadow: none; } table { min-width: 0; font-size: 10px; } .foto { width: 80px; height: 60px; } }
+		@media print { body { padding: 0; background: #fff; } header, .filtros, .nota, .resultados, .paginacion, .exportar { display: none; } .tabla-contenedor { box-shadow: none; } table { min-width: 0; font-size: 10px; } .foto { width: 80px; height: 60px; } }
 		@media (max-width: 620px) { body { padding: 18px 12px; } header { align-items: flex-start; flex-direction: column; } h1 { font-size: 25px; } }
 		@media (max-width: 900px) { .filtros { grid-template-columns: repeat(2, 1fr); } .limpiar { align-self: center; } }
 		@media (max-width: 480px) { .filtros { grid-template-columns: 1fr; } .limpiar { width: 100%; } }
@@ -93,6 +98,18 @@
 		<button class="limpiar" type="button" onclick="limpiarFiltros()">Limpiar filtros</button>
 	</section>
 	<p class="resultados" id="contadorRegistros"></p>
+	<nav class="paginacion" aria-label="Paginación de registros">
+		<button id="paginaAnterior" type="button" aria-label="Página anterior">Anterior</button>
+		<span id="paginaActual" aria-live="polite"></span>
+		<button id="paginaSiguiente" type="button" aria-label="Página siguiente">Siguiente</button>
+		<label for="tamanoPagina">Mostrar
+			<select id="tamanoPagina">
+				<option value="10">10</option>
+				<option value="30">30</option>
+				<option value="50">50</option>
+			</select>
+		</label>
+	</nav>
 	<div class="exportar">
 		<button type="button" onclick="exportarExcel()">Exportar Excel</button>
 		<button class="pdf" type="button" onclick="exportarPdf()">Exportar PDF</button>
@@ -137,8 +154,14 @@
 	const filtroObra = document.getElementById("filtroObra");
 	const filtroDesde = document.getElementById("filtroDesde");
 	const filtroHasta = document.getElementById("filtroHasta");
+	const paginaAnterior = document.getElementById("paginaAnterior");
+	const paginaSiguiente = document.getElementById("paginaSiguiente");
+	const paginaActual = document.getElementById("paginaActual");
+	const tamanoPagina = document.getElementById("tamanoPagina");
 	let registros = [];
 	let registrosVisibles = [];
+	let numeroPagina = 1;
+	let imprimirTodosLosRegistros = false;
 	let mapaOperarios = null;
 	let fuenteMapa = null;
 
@@ -158,9 +181,14 @@
 			return coincidePersona && coincideTipo && coincideObra && coincideDesde && coincideHasta;
 		});
 		registrosVisibles = registrosFiltrados;
+		const cantidadPorPagina = imprimirTodosLosRegistros ? registrosFiltrados.length || 1 : Number(tamanoPagina.value);
+		const totalPaginas = Math.ceil(registrosFiltrados.length / cantidadPorPagina) || 1;
+		numeroPagina = Math.min(numeroPagina, totalPaginas);
+		const inicio = (numeroPagina - 1) * cantidadPorPagina;
+		const registrosPagina = registrosFiltrados.slice(inicio, inicio + cantidadPorPagina);
 
 		cuerpo.innerHTML = "";
-		registrosFiltrados.forEach(function(registro) {
+		registrosPagina.forEach(function(registro) {
 		const fila = document.createElement("tr");
 		const claseMovimiento = registro.tipo === "ENTRADA" ? "entrada" : "salida";
 		const fotoSrc = `data:image/jpeg;base64,${registro.fotografia}`;
@@ -196,12 +224,29 @@
 
 		vacio.textContent = registros.length ? "No hay registros que coincidan con los filtros." : "Todavía no hay movimientos registrados.";
 		vacio.style.display = registrosFiltrados.length ? "none" : "block";
-		contadorRegistros.textContent = `Mostrando ${registrosFiltrados.length} de ${registros.length} registros`;
+		const fin = Math.min(inicio + registrosPagina.length, registrosFiltrados.length);
+		contadorRegistros.textContent = `Mostrando ${registrosFiltrados.length ? inicio + 1 : 0}-${fin} de ${registrosFiltrados.length} registros (${registros.length} en total)`;
+		paginaActual.textContent = `Página ${numeroPagina} de ${totalPaginas}`;
+		paginaAnterior.disabled = numeroPagina === 1;
+		paginaSiguiente.disabled = numeroPagina === totalPaginas;
 	}
 
 	[filtroPersona, filtroTipo, filtroObra, filtroDesde, filtroHasta].forEach(function(filtro) {
-		filtro.addEventListener("input", mostrarRegistros);
-		filtro.addEventListener("change", mostrarRegistros);
+		filtro.addEventListener("input", function() { numeroPagina = 1; mostrarRegistros(); });
+		filtro.addEventListener("change", function() { numeroPagina = 1; mostrarRegistros(); });
+	});
+
+	paginaAnterior.addEventListener("click", function() {
+		numeroPagina--;
+		mostrarRegistros();
+	});
+	paginaSiguiente.addEventListener("click", function() {
+		numeroPagina++;
+		mostrarRegistros();
+	});
+	tamanoPagina.addEventListener("change", function() {
+		numeroPagina = 1;
+		mostrarRegistros();
 	});
 
 	function limpiarFiltros() {
@@ -210,6 +255,7 @@
 		filtroObra.value = "";
 		filtroDesde.value = "";
 		filtroHasta.value = "";
+		numeroPagina = 1;
 		mostrarRegistros();
 	}
 
@@ -251,6 +297,13 @@
 			alert("No hay registros para exportar.");
 			return;
 		}
+		imprimirTodosLosRegistros = true;
+		numeroPagina = 1;
+		mostrarRegistros();
+		window.addEventListener("afterprint", function restaurarPaginacion() {
+			imprimirTodosLosRegistros = false;
+			mostrarRegistros();
+		}, { once: true });
 		window.print();
 	}
 
