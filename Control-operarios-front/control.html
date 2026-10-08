@@ -496,8 +496,8 @@
                 throw new Error(resultado.mensaje || "No se pudo guardar el movimiento.");
             }
 
-            alert("Movimiento guardado correctamente.");
-            window.location.reload();
+            alert(`La marcación de ${tipo.toLowerCase()} se realizó correctamente. Se cerrará la sesión.`);
+            window.location.replace("logout.html");
         } catch (error) {
             alert(error.message || "No se pudo conectar con el servidor.");
             botonEnviar.disabled = false;
